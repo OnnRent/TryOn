@@ -1,69 +1,60 @@
-import { View, Text, StyleSheet, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { useAuth } from "../src/context/AuthContext";
-import { router } from "expo-router";
 import { COLORS } from "../src/theme/colors";
-import { BlurView } from "expo-blur";
+import { router } from "expo-router";
 
 export default function SignInScreen() {
   const { login } = useAuth();
 
-  async function handleAppleSignIn() {
+  async function signInWithApple() {
     try {
-      const credential =
-        await AppleAuthentication.signInAsync({
-          requestedScopes: [
-            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-            AppleAuthentication.AppleAuthenticationScope.EMAIL,
-          ],
-        });
+      // const credential = await AppleAuthentication.signInAsync({
+      //   requestedScopes: [
+      //     AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+      //     AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      //   ],
+      // });
 
-      // ✅ Save user in auth context
-      login({
-        id: credential.user,
-        email: credential.email ?? undefined,
-        name: credential.fullName
-          ? `${credential.fullName.givenName ?? ""} ${
-              credential.fullName.familyName ?? ""
-            }`.trim()
-          : undefined,
+      // const res = await fetch("http://localhost:3000/auth/apple", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({
+      //     identityToken: credential.identityToken,
+      //   }),
+      // });
+
+      // 🟢 DEV 
+      const res = await fetch("http://localhost:3000/auth/dev", {
+        method: "POST"
       });
+      console.log("Apple Sign In response status:", res);
+      const data = await res.json();
+      await login(data.token);
 
-      // 🚀 Go to Home
-      router.replace("/");
-    } catch (e: any) {
-      if (e.code === "ERR_CANCELED") {
-        // User cancelled → do nothing
-        return;
-      }
-      console.error("Apple Sign In error", e);
+      router.replace("/"); // 🔥 THIS WAS MISSING
+
+    } catch (e) {
+      console.log("Apple Sign In cancelled or failed", e);
     }
   }
 
   return (
     <View style={styles.container}>
-      {/* Glass card */}
-      <BlurView intensity={40} tint="dark" style={styles.card}>
-        <Text style={styles.logo}>TryOn</Text>
-        <Text style={styles.subtitle}>
-          Sign in to continue
-        </Text>
+      <Text style={styles.logo}>TryOn</Text>
+      <Text style={styles.tagline}>AI fashion that fits you</Text>
 
-        {/* Apple Sign In (iOS ONLY) */}
-        {Platform.OS === "ios" && (
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={
-              AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
-            }
-            buttonStyle={
-              AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-            }
-            cornerRadius={14}
-            style={styles.appleButton}
-            onPress={handleAppleSignIn}
-          />
-        )}
-      </BlurView>
+      <AppleAuthentication.AppleAuthenticationButton
+        buttonType={
+          AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+        }
+        buttonStyle={
+          AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+        }
+        cornerRadius={28}
+        style={styles.appleBtn}
+        onPress={signInWithApple}
+      />
     </View>
   );
 }
@@ -74,34 +65,21 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 32,
   },
-
-  card: {
-    width: "88%",
-    paddingVertical: 40,
-    paddingHorizontal: 24,
-    borderRadius: 28,
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-  },
-
   logo: {
-    fontSize: 32,
+    fontSize: 38,
     fontWeight: "800",
     color: COLORS.textPrimary,
-    marginBottom: 6,
+    marginBottom: 8,
   },
-
-  subtitle: {
-    fontSize: 14,
+  tagline: {
+    fontSize: 15,
     color: COLORS.textSecondary,
-    marginBottom: 28,
+    marginBottom: 40,
   },
-
-  appleButton: {
-    width: 260,
-    height: 50,
+  appleBtn: {
+    width: "100%",
+    height: 56,
   },
 });

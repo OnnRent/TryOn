@@ -1,15 +1,15 @@
 import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState } from "react";
-import { COLORS } from "../src/theme/colors";
+import { COLORS } from "../../src/theme/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
-import SelectClothesModal from "../src/components/SelectClothesModal";
+import SelectClothesModal from "../../src/components/SelectClothesModal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import WardrobeSelectModal from "@/src/components/WardrobeSelectModal";
-import ProcessingScreen from "../src/components/ProcessingScreen";
-import ResultScreen from "../src/components/ResultScreen";
+import ProcessingScreen from "../../src/components/ProcessingScreen";
+import ResultScreen from "../../src/components/ResultScreen";
 import { Image } from "react-native";
 
 

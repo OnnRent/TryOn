@@ -1,12 +1,12 @@
 import { View, FlatList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from "react";
-import { COLORS } from "../src/theme/colors";
-import WardrobeNavbar from "../src/components/WardrobeNavbar";
-import WardrobeToggle from "../src/components/WardrobeToggle";
-import WardrobeItemCard from "../src/components/WardrobeItemCard";
-import UploadWardrobeModal from "../src/components/UploadWardrobeModal";
-import ImagePreviewModal from "../src/components/ImagePreviewModal";
+import { COLORS } from "../../src/theme/colors";
+import WardrobeNavbar from "../../src/components/WardrobeNavbar";
+import WardrobeToggle from "../../src/components/WardrobeToggle";
+import WardrobeItemCard from "../../src/components/WardrobeItemCard";
+import UploadWardrobeModal from "../../src/components/UploadWardrobeModal";
+import ImagePreviewModal from "../../src/components/ImagePreviewModal";
 
 const MOCK_IMAGES = Array.from({ length: 12 }).map(
   (_, i) => `https://picsum.photos/400/600?random=${i + 20}`

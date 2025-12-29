@@ -2,12 +2,12 @@ import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect } from "react";
 import { router } from "expo-router";
-import { COLORS } from "../src/theme/colors";
-import { useAuth } from "../src/context/AuthContext";
+import { COLORS } from "../../src/theme/colors";
+import { useAuth } from "../../src/context/AuthContext";
 
-import HomeNavbar from "../src/components/HomeNavbar";
-import HomeSectionHeader from "../src/components/HomeSectionHeader";
-import ImageCarousel from "../src/components/ImageCarousel";
+import HomeNavbar from "../../src/components/HomeNavbar";
+import HomeSectionHeader from "../../src/components/HomeSectionHeader";
+import ImageCarousel from "../../src/components/ImageCarousel";
 
 const MOCK_IMAGES = Array.from({ length: 7 }).map(
   (_, i) => `https://picsum.photos/400/600?random=${i}`
@@ -24,9 +24,9 @@ export default function HomeScreen() {
   }, [user]);
 
   // ⛔ Prevent UI flicker
-  if (!user) {
-    return <View style={{ flex: 1, backgroundColor: COLORS.background }} />;
-  }
+  // if (!user) {
+  //   return <View style={{ flex: 1, backgroundColor: COLORS.background }} />;
+  // }
 
   return (
     <SafeAreaView

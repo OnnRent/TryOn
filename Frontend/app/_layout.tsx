@@ -1,32 +1,44 @@
+// app/_layout.tsx
 import { Slot, usePathname, router } from "expo-router";
+import { useEffect } from "react";
 import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import GlassTabBar from "../src/components/GlassTabBar";
-import { COLORS } from "../src/theme/colors";
 import { StatusBar } from "expo-status-bar";
-import { AuthProvider } from "../src/context/AuthContext";
+import { AuthProvider, useAuth } from "../src/context/AuthContext";
+import { COLORS } from "../src/theme/colors";
 
-export default function RootLayout() {
+function Root() {
+  const { token, checked } = useAuth();
   const pathname = usePathname();
 
-  const hideTabBar =
-    pathname === "/camera" || pathname === "/signin";
+  useEffect(() => {
+    if (!checked) return;
+
+    if (!token && pathname !== "/signin") {
+      router.replace("/signin");
+    }
+
+    if (token && pathname === "/signin") {
+      router.replace("/"); // go to app
+    }
+  }, [token, checked, pathname]);
+
+  if (!checked) return null;
 
   return (
-    <AuthProvider>
-      <SafeAreaProvider>
-        <StatusBar style="light" />
-        <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-          <Slot />
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <Slot />
+    </View>
+  );
+}
 
-          {!hideTabBar && (
-            <GlassTabBar
-              activePath={pathname}
-              onNavigate={(path) => router.push(path)}
-            />
-          )}
-        </View>
-      </SafeAreaProvider>
-    </AuthProvider>
+export default function Layout() {
+  return (
+    <SafeAreaProvider>
+      <StatusBar style="light" />
+      <AuthProvider>
+        <Root />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
