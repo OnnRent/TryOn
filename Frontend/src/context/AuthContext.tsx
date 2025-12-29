@@ -1,6 +1,8 @@
+// src/context/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import { api } from "../utils/api";
 
 type AuthContextType = {
   token: string | null;
@@ -17,22 +19,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const saved = await AsyncStorage.getItem("token");
-      if (saved) setToken(saved);
-      setChecked(true);
+      try {
+        const saved = await AsyncStorage.getItem("token");
+        if (saved) {
+          setToken(saved);
+        }
+      } catch (err) {
+        console.error("Failed to load token:", err);
+      } finally {
+        setChecked(true);
+      }
     })();
   }, []);
 
   async function login(jwt: string) {
-    await AsyncStorage.setItem("token", jwt);
-    setToken(jwt);
-    router.replace("/"); 
+    try {
+      await AsyncStorage.setItem("token", jwt);
+      setToken(jwt);
+    } catch (err) {
+      console.error("Failed to save token:", err);
+      setToken(jwt);
+    }
   }
 
   async function logout() {
-    await AsyncStorage.removeItem("token");
-    setToken(null);
-    router.replace("/signin");
+    try {
+      // Optional: Call backend logout API
+      await api.auth.logout();
+    } catch (err) {
+      console.error("Backend logout failed:", err);
+    }
+
+    try {
+      await AsyncStorage.removeItem("token");
+    } catch (err) {
+      console.error("Failed to remove token:", err);
+    } finally {
+      setToken(null);
+      router.replace("/signin");
+    }
   }
 
   return (

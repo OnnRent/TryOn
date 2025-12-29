@@ -14,14 +14,14 @@ const MOCK_IMAGES = Array.from({ length: 7 }).map(
 );
 
 export default function HomeScreen() {
-  const { user } = useAuth();
+  // const { user } = useAuth();
 
-  // 🔐 AUTH GUARD
-  useEffect(() => {
-    if (!user) {
-      router.replace("/signin");
-    }
-  }, [user]);
+  // // 🔐 AUTH GUARD
+  // useEffect(() => {
+  //   if (!user) {
+  //     router.replace("/signin");
+  //   }
+  // }, [user]);
 
   // ⛔ Prevent UI flicker
   // if (!user) {

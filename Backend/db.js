@@ -7,9 +7,9 @@ const s3 = new AWS.S3();
 
 const pool = new Pool({
   user: "postgres",
-  host: process.env.DB_HOST,
+  host: process.env.DBHOST,
   database: "wardrobe_db",
-  password:process.env.DB_PASSWORD,
+  password:process.env.DBPASSWORD,
   port: 5432,
   ssl: {
     rejectUnauthorized: false
