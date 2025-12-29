@@ -1,16 +1,16 @@
 const express = require("express");
 const app = express();
-const { v4: uuidv4 } = await import('uuid');
-const pool = require("./db");
-const multer = require("multer");
+// const { v4: uuidv4 } = await import('uuid');
+// const pool = require("./db");
+// const multer = require("multer");
 const cors = require("cors");
 require("dotenv").config();
-const s3 = require("./s3");
-const removeBackground = require("./removeBackground");
-const scrapeProductImages = require("./scrapeProductImages");
-const axios = require("axios");
-const { verifyAppleToken } = require("./auth/apple");
-const { createToken, verifyToken } = require("./auth/jwt");
+// const s3 = require("./s3");
+// const removeBackground = require("./removeBackground");
+// const scrapeProductImages = require("./scrapeProductImages");
+// const axios = require("axios");
+// const { verifyAppleToken } = require("./auth/apple");
+// const { createToken, verifyToken } = require("./auth/jwt");
 
 
 
