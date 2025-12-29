@@ -20,9 +20,17 @@ app.use(cors({
 
 app.use(express.json());
 
-app.listen(3000, () => {
-  console.log("Server running on https://try-on-ochre.vercel.app/");
+if (process.env.NODE_ENV !== "production") {
+  app.listen(3000, () => {
+    console.log("Server running on http://localhost:3000");
+  });
+}
+
+
+app.get("/", (req, res) => {
+  res.json({ status: "OK", message: "TryOn API is running" });
 });
+
 
 app.post("/auth/apple", async (req, res) => {
   try {
