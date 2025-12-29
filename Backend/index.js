@@ -21,7 +21,7 @@ app.use(cors({
 app.use(express.json());
 
 app.listen(3000, () => {
-  console.log("Server running on http://localhost:3000");
+  console.log("Server running on https://try-on-ochre.vercel.app/");
 });
 
 app.post("/auth/apple", async (req, res) => {
