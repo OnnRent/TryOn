@@ -198,10 +198,29 @@ app.post(
   }
 );
 
+app.get("/auth/me", verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, email FROM users WHERE id = $1",
+      [req.userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    res.json({ user: result.rows[0] });
+  } catch (err) {
+    console.error("GET USER ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 
-app.get("/wardrobe/:wardrobe_item_id/images", async (req, res) => {
+
+
+app.get("/wardrobe/:wardrobe_item_id/images", verifyToken, async (req, res) => {
   try {
     const { wardrobe_item_id } = req.params;
 
@@ -261,14 +280,24 @@ app.get("/wardrobe", verifyToken, async (req, res) => {
   res.json(result.rows);
 });
 
-app.post("/wardrobe/link", async (req, res) => {
-  try {
+
+app.post("/wardrobe/link", verifyToken, async (req, res) => {
+  try { // ✅ ADD THIS
     const { wardrobe_item_id, product_url } = req.body;
 
     if (!wardrobe_item_id || !product_url) {
       return res.status(400).json({
         error: "wardrobe_item_id and product_url are required"
       });
+    }
+    
+    // Verify ownership
+    const owner = await pool.query(
+      `SELECT 1 FROM wardrobe_items WHERE id = $1 AND user_id = $2`,
+      [wardrobe_item_id, req.userId]
+    );
+    if (owner.rows.length === 0) {
+      return res.status(403).json({ error: "Unauthorized" });
     }
 
     // 🔴 Check duplicate
@@ -305,7 +334,7 @@ app.post("/wardrobe/link", async (req, res) => {
       );
 
       // 3️⃣ Upload to S3
-      const s3Key = `raw/wardrobe/${wardrobe_item_id}/${views[i]}.png`;
+      const s3Key = `raw/${req.userId}/wardrobe/${wardrobe_item_id}/${views[i]}.png`; // ✅ ADD user_id to path
 
       await s3.upload({
         Bucket: process.env.S3BUCKETNAME,
@@ -318,12 +347,13 @@ app.post("/wardrobe/link", async (req, res) => {
       await pool.query(
         `
         INSERT INTO wardrobe_images
-        (id, wardrobe_item_id, view, raw_path, status)
-        VALUES ($1, $2, $3, $4, $5)
+        (id, wardrobe_item_id, user_id, view, raw_path, status)
+        VALUES ($1, $2, $3, $4, $5, $6)
         `,
         [
           uuidv4(),
           wardrobe_item_id,
+          req.userId, // ✅ ADD user_id
           views[i],
           s3Key,
           "uploaded"
@@ -340,7 +370,6 @@ app.post("/wardrobe/link", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 
 // For Testing
