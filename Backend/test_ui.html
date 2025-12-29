@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Wardrobe Upload Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .box {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    input, select, button {
+      margin-top: 10px;
+      display: block;
+      width: 100%;
+      max-width: 500px;
+    }
+    img {
+      max-width: 200px;
+      margin: 10px;
+      border: 1px solid #ddd;
+    }
+    .item {
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin-bottom: 15px;
+    }
+    .divider {
+      text-align: center;
+      margin: 15px 0;
+      font-weight: bold;
+    }
+    .status {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+    <!-- AUTH -->
+<div class="box">
+  <h3>🔐 Authentication</h3>
+
+  <textarea
+    id="identityToken"
+    placeholder="Paste Apple identityToken here"
+    rows="4"
+  ></textarea>
+
+  <button onclick="login()">Login (Apple)</button>
+  <button onclick="logout()">Logout</button>
+
+  <p class="status" id="authStatus">Not logged in</p>
+</div>
+
+<h2>👕 Wardrobe Upload Test UI</h2>
+
+<!-- STEP 1 -->
+<div class="box">
+  <h3>1️⃣ Create Wardrobe Item</h3>
+
+  <select id="category">
+    <option value="top">Top</option>
+    <option value="bottom">Bottom</option>
+  </select>
+
+  <button onclick="createItem()">Create Item</button>
+
+  <p>
+    <b>Wardrobe Item ID:</b>
+    <span id="itemId">-</span>
+  </p>
+</div>
+
+<!-- STEP 2A -->
+<div class="box">
+  <h3>2️⃣ Upload Front & Back Images</h3>
+
+  <label><b>Front Image</b></label>
+  <input type="file" id="frontPhoto" accept="image/*" />
+
+  <label><b>Back Image</b></label>
+  <input type="file" id="backPhoto" accept="image/*" />
+
+  <button id="uploadBtn" onclick="uploadImages()" disabled>
+    Upload Images
+  </button>
+
+  <p class="status" id="uploadStatus"></p>
+
+  <div class="divider">OR</div>
+
+  <!-- STEP 2B -->
+  <h3>Upload via Product Link</h3>
+
+  <input
+    type="text"
+    id="productLink"
+    placeholder="Paste product URL (Flipkart, Amazon, etc.)"
+  />
+
+  <button onclick="uploadViaLink()">
+    Import Images from Link
+  </button>
+
+  <p class="status" id="linkStatus"></p>
+</div>
+
+<!-- STEP 3 -->
+<div class="box">
+  <h3>3️⃣ View Wardrobe Items</h3>
+  <button onclick="loadWardrobe()">Load Wardrobe</button>
+  <div id="wardrobeList"></div>
+</div>
+
+<script>
+let wardrobeItemId = null;
+
+// Enable upload button only when both images selected
+document.getElementById("frontPhoto").addEventListener("change", toggleUpload);
+document.getElementById("backPhoto").addEventListener("change", toggleUpload);
+
+function toggleUpload() {
+  const front = document.getElementById("frontPhoto").files.length;
+  const back = document.getElementById("backPhoto").files.length;
+  document.getElementById("uploadBtn").disabled = !(front && back);
+}
+
+// STEP 1
+async function createItem() {
+  const category = document.getElementById("category").value;
+
+  const res = await fetch("http://localhost:3000/wardrobe/item", {
+    method: "POST",
+    headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${authToken}`
+    },
+
+    body: JSON.stringify({ category })
+  });
+
+  const data = await res.json();
+  wardrobeItemId = data.wardrobe_item_id;
+  document.getElementById("itemId").innerText = wardrobeItemId;
+}
+
+// STEP 2A
+async function uploadImages() {
+  if (!wardrobeItemId) {
+    alert("Create wardrobe item first");
+    return;
+  }
+
+  const front = document.getElementById("frontPhoto").files[0];
+  const back = document.getElementById("backPhoto").files[0];
+
+  const formData = new FormData();
+  formData.append("front", front);
+  formData.append("back", back);
+  formData.append("wardrobe_item_id", wardrobeItemId);
+
+  document.getElementById("uploadStatus").innerText = "Uploading...";
+
+  const res = await fetch("http://localhost:3000/wardrobe/image", {
+    method: "POST",
+    headers: {
+        Authorization: `Bearer ${authToken}`
+    },
+    body: formData
+    });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    document.getElementById("uploadStatus").innerText = "❌ " + data.error;
+    return;
+  }
+
+  document.getElementById("uploadStatus").innerText =
+    "✅ Images uploaded successfully";
+}
+
+// STEP 2B
+async function uploadViaLink() {
+  if (!wardrobeItemId) {
+    alert("Create wardrobe item first");
+    return;
+  }
+
+  const productUrl = document.getElementById("productLink").value.trim();
+
+  if (!productUrl) {
+    alert("Paste product URL");
+    return;
+  }
+
+  document.getElementById("linkStatus").innerText =
+    "Fetching & processing images...";
+
+  const res = await fetch("http://localhost:3000/wardrobe/link", {
+    method: "POST",
+    headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${authToken}`
+    },
+    body: JSON.stringify({
+      wardrobe_item_id: wardrobeItemId,
+      product_url: productUrl
+    })
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    document.getElementById("linkStatus").innerText = "❌ " + data.error;
+    return;
+  }
+
+  document.getElementById("linkStatus").innerText =
+    "✅ Images imported from product link";
+}
+
+// STEP 3
+async function loadWardrobe() {
+  const res = await fetch("http://localhost:3000/wardrobe", {
+    headers: {
+        Authorization: `Bearer ${authToken}`
+    }
+    });
+  const items = await res.json();
+
+  const container = document.getElementById("wardrobeList");
+  container.innerHTML = "";
+
+  items.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "item";
+
+    div.innerHTML = `
+      <b>Item ID:</b> ${item.id}<br/>
+      <b>Category:</b> ${item.category}<br/>
+      <button onclick="showImages('${item.id}', this)">
+        Show Images
+      </button>
+      <div class="images"></div>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+
+//TODO : WHEN WORKING WITH PRODUCTION APPLE LOGIN, UNCOMMENT THIS
+// async function login() {
+//   const identityToken = document.getElementById("identityToken").value.trim();
+
+//   if (!identityToken) {
+//     alert("Paste identityToken");
+//     return;
+//   }
+
+//   const res = await fetch("http://localhost:3000/auth/apple", {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify({ identityToken })
+//   });
+
+//   const data = await res.json();
+
+//   if (!res.ok) {
+//     document.getElementById("authStatus").innerText = "❌ Login failed";
+//     return;
+//   }
+
+//   authToken = data.token;
+//   localStorage.setItem("jwt", authToken);
+
+//   document.getElementById("authStatus").innerText =
+//     "✅ Logged in successfully";
+// }
+
+// function logout() {
+//   localStorage.removeItem("jwt");
+//   authToken = null;
+
+//   document.getElementById("authStatus").innerText =
+//     "🚪 Logged out";
+// }
+
+async function login() {
+  const res = await fetch("http://localhost:3000/auth/dev", {
+    method: "POST"
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    document.getElementById("authStatus").innerText = "❌ Dev login failed";
+    return;
+  }
+
+  authToken = data.token;
+  localStorage.setItem("jwt", authToken);
+
+  document.getElementById("authStatus").innerText =
+    "✅ Logged in (DEV user)";
+}
+
+// STEP 4
+async function showImages(itemId, btn) {
+  const imagesDiv = btn.nextElementSibling;
+  imagesDiv.innerText = "Loading images...";
+
+  const res = await fetch(
+    `http://localhost:3000/wardrobe/${itemId}/images`,
+    {
+        headers: {
+        Authorization: `Bearer ${authToken}`
+        }
+    }
+    );
+
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    imagesDiv.innerText = data.error;
+    return;
+  }
+
+  imagesDiv.innerHTML = "";
+
+  if (data.images.front) {
+    imagesDiv.innerHTML += `<img src="${data.images.front}" />`;
+  }
+  if (data.images.back) {
+    imagesDiv.innerHTML += `<img src="${data.images.back}" />`;
+  }
+}
+
+let authToken = localStorage.getItem("jwt") || null;
+
+if (authToken) {
+  document.getElementById("authStatus").innerText = "✅ Logged in";
+}
+</script>
+
+</body>
+</html>
