@@ -20,9 +20,7 @@ exports.handler = async (event) => {
   const record = event.Records[0];
   const bucket = record.s3.bucket.name;
   const rawKey = decodeURIComponent(record.s3.object.key);
-
   if (!rawKey.startsWith("raw/")) return;
-
   console.log("Processing:", rawKey);
 
   // Example: raw/wardrobe/{itemId}/front.jpg
