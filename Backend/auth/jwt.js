@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 exports.createToken = (userId) => {
   return jwt.sign(
     { userId },
-    process.env.JWT_SECRET,
+    process.env.JWTSECRET,
     { expiresIn: "30d" }
   );
 };
@@ -17,7 +17,7 @@ exports.verifyToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(
       auth.split(" ")[1],
-      process.env.JWT_SECRET
+      process.env.JWTSECRET
     );
 
     req.userId = decoded.userId;

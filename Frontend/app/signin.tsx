@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { useAuth } from "../src/context/AuthContext";
 import { COLORS } from "../src/theme/colors";
@@ -9,33 +9,25 @@ export default function SignInScreen() {
 
   async function signInWithApple() {
     try {
-      // const credential = await AppleAuthentication.signInAsync({
-      //   requestedScopes: [
-      //     AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-      //     AppleAuthentication.AppleAuthenticationScope.EMAIL,
-      //   ],
-      // });
-
-      // const res = await fetch("http://localhost:3000/auth/apple", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({
-      //     identityToken: credential.identityToken,
-      //   }),
-      // });
-
-      // 🟢 DEV 
       const res = await fetch("http://localhost:3000/auth/dev", {
         method: "POST"
       });
-      console.log("Apple Sign In response status:", res);
+      
+      if (!res.ok) {
+        console.error("Login failed:", res.status);
+        return;
+      }
+      
       const data = await res.json();
+      console.log("✅ Got token, logging in...");
+      
       await login(data.token);
-
-      router.replace("/"); // 🔥 THIS WAS MISSING
+      
+      console.log("✅ Login successful, navigating...");
+      router.replace("/(app)"); // ✅ Note the trailing slash
 
     } catch (e) {
-      console.log("Apple Sign In cancelled or failed", e);
+      console.error("Sign in error:", e);
     }
   }
 

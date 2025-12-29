@@ -15,7 +15,7 @@ async function removeBackground(buffer) {
     {
       headers: {
         ...formData.getHeaders(),
-        "X-Api-Key": process.env.REMOVE_BG_API_KEY,
+        "X-Api-Key": process.env.REMOVEBGAPIKEY,
       },
       responseType: "arraybuffer",
     }

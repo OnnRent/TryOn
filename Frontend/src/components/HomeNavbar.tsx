@@ -1,12 +1,36 @@
-import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+// src/components/HomeNavbar.tsx
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from "react-native";
 import { COLORS } from "../theme/colors";
+import { useAuth } from "../context/AuthContext";
 
 export default function HomeNavbar() {
+  const { logout } = useAuth();
+
+  function handleAvatarPress() {
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: async () => {
+            await logout();
+          }
+        }
+      ]
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.logo}>TryOn</Text>
 
-      <TouchableOpacity>
+      <TouchableOpacity onPress={handleAvatarPress} activeOpacity={0.7}>
         <Image
           source={{ uri: "https://i.pravatar.cc/100" }}
           style={styles.avatar}

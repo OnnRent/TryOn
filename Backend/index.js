@@ -217,7 +217,21 @@ app.get("/auth/me", verifyToken, async (req, res) => {
 });
 
 
+app.post("/auth/logout", verifyToken, async (req, res) => {
+  try {
+    // Optional: Log the logout event in database
+    await pool.query(
+      `INSERT INTO user_sessions (user_id, action, timestamp)
+       VALUES ($1, $2, NOW())`,
+      [req.userId, "logout"]
+    );
 
+    res.json({ message: "Logged out successfully" });
+  } catch (err) {
+    console.error("LOGOUT ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 app.get("/wardrobe/:wardrobe_item_id/images", verifyToken, async (req, res) => {
@@ -374,7 +388,7 @@ app.post("/wardrobe/link", verifyToken, async (req, res) => {
 
 // For Testing
 app.post("/auth/dev", async (req, res) => {
-  if (process.env.NODE_ENV !== "development") {
+  if (process.env.NODEENV !== "development") {
     return res.status(403).json({ error: "Forbidden" });
   }
 

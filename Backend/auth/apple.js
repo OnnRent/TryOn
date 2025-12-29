@@ -17,7 +17,7 @@ exports.verifyAppleToken = (identityToken) =>
       identityToken,
       getKey,
       {
-        audience: process.env.APPLE_CLIENT_ID,
+        audience: process.env.APPLECLIENTID,
         issuer: "https://appleid.apple.com",
       },
       (err, decoded) => {
