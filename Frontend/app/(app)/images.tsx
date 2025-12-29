@@ -1,10 +1,10 @@
 import { View, FlatList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from "react";
-import { COLORS } from "../src/theme/colors";
-import ImagesNavbar from "../src/components/ImagesNavbar";
-import GeneratedImageCard from "../src/components/GeneratedImageCard";
-import ImagePreviewModal from "../src/components/ImagePreviewModal";
+import { COLORS } from "../../src/theme/colors";
+import ImagesNavbar from "../../src/components/ImagesNavbar";
+import GeneratedImageCard from "../../src/components/GeneratedImageCard";
+import ImagePreviewModal from "../../src/components/ImagePreviewModal";
 
 type GeneratedImage = {
   front: string;
