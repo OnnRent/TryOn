@@ -1,11 +1,6 @@
 const express = require("express");
 const app = express();
-// const { v4: uuidv4 } = require('uuid');
-let uuidv4;
-(async () => {
-  const uuid = await import('uuid');
-  uuidv4 = uuid.v4;
-})();
+const { v4: uuidv4 } = require('uuid');
 const pool = require("./db");
 const multer = require("multer");
 const cors = require("cors");
