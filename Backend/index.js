@@ -10,6 +10,7 @@ const removeBackground = require("./removeBackground");
 const scrapeProductImages = require("./scrapeProductImages");
 const { generateTryOnImage } = require("./geminiTryOn");
 const axios = require("axios");
+const sharp = require("sharp");
 const { verifyAppleToken } = require("./auth/apple");
 const { createToken, verifyToken } = require("./auth/jwt");
 
@@ -311,9 +312,9 @@ app.post(
       });
 
       // Validate inputs
-      if (!req.files?.person_image || !req.files?.clothing_image) {
+      if (!req.files?.person_image) {
         return res.status(400).json({
-          error: "Both person_image and clothing_image are required",
+          error: "person_image is required",
         });
       }
 
@@ -324,7 +325,37 @@ app.post(
       }
 
       const personImageBuffer = req.files.person_image[0].buffer;
-      const clothingImageBuffer = req.files.clothing_image[0].buffer;
+
+      // Handle clothing image - can be either file upload or base64 string
+      let clothingImageBuffer;
+
+      if (req.files?.clothing_image) {
+        // Clothing image uploaded as file
+        clothingImageBuffer = req.files.clothing_image[0].buffer;
+        console.log("📦 Clothing image received as file upload");
+      } else if (req.body.clothing_image_base64) {
+        // Clothing image sent as base64 string
+        console.log("📦 Clothing image received as base64 string");
+        clothingImageBuffer = Buffer.from(req.body.clothing_image_base64, 'base64');
+      } else {
+        return res.status(400).json({
+          error: "clothing_image (file) or clothing_image_base64 (string) is required",
+        });
+      }
+
+      console.log(`📊 Received buffers: Person=${personImageBuffer.length}B, Clothing=${clothingImageBuffer.length}B`);
+
+      if (personImageBuffer.length === 0) {
+        return res.status(400).json({
+          error: "Person image buffer is empty. Please ensure the image is properly uploaded.",
+        });
+      }
+
+      if (clothingImageBuffer.length === 0) {
+        return res.status(400).json({
+          error: "Clothing image buffer is empty. Please ensure the image is properly uploaded.",
+        });
+      }
 
       // Upload original images to S3
       const personImageKey = `tryon/${req.userId}/person/${uuidv4()}.jpg`;

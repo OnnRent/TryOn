@@ -1,5 +1,6 @@
 const axios = require("axios");
 const fs = require("fs");
+const sharp = require("sharp");
 
 /**
  * Generate virtual try-on image using Gemini 2.5 Flash Image (Nano Banana Pro)
@@ -11,14 +12,36 @@ const fs = require("fs");
 async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothingType) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
-    
+
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY not found in environment variables");
     }
 
+    console.log("🔧 Preprocessing images for Gemini API...");
+
+    // Preprocess images: resize and optimize for Gemini API
+    // Gemini API has limits: max 4MB per image, recommended 1024x1024 or smaller
+    const processedPersonImage = await sharp(personImageBuffer)
+      .resize(1024, 1024, {
+        fit: "inside", // Maintain aspect ratio
+        withoutEnlargement: true, // Don't upscale small images
+      })
+      .jpeg({ quality: 85 }) // Convert to JPEG with good quality
+      .toBuffer();
+
+    const processedClothingImage = await sharp(clothingImageBuffer)
+      .resize(1024, 1024, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+
+    console.log(`📊 Image sizes: Person=${(processedPersonImage.length / 1024).toFixed(1)}KB, Clothing=${(processedClothingImage.length / 1024).toFixed(1)}KB`);
+
     // Convert buffers to base64
-    const personImageBase64 = personImageBuffer.toString("base64");
-    const clothingImageBase64 = clothingImageBuffer.toString("base64");
+    const personImageBase64 = processedPersonImage.toString("base64");
+    const clothingImageBase64 = processedClothingImage.toString("base64");
 
     // Create detailed prompt based on clothing type
     const prompt = createTryOnPrompt(clothingType);
@@ -49,17 +72,20 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
     };
 
     console.log("🎨 Sending request to Gemini API for virtual try-on...");
+    console.log(`📝 Prompt length: ${prompt.length} characters`);
 
-    // Call Gemini API
+    // Call Gemini API with image generation model
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent`,
       requestBody,
       {
         headers: {
           "x-goog-api-key": apiKey,
           "Content-Type": "application/json",
         },
-        timeout: 60000, // 60 second timeout
+        timeout: 120000, // 120 second timeout (increased for image generation)
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
       }
     );
 
@@ -79,10 +105,16 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
       }
     }
 
+    console.error("❌ No image data in Gemini API response");
+    console.error("Response structure:", JSON.stringify(response.data, null, 2));
     throw new Error("No image data in Gemini API response");
   } catch (error) {
-    console.error("❌ Gemini API Error:", error.response?.data || error.message);
-    throw new Error(`Failed to generate try-on image: ${error.message}`);
+    if (error.response?.data) {
+      console.error("❌ Gemini API Error Response:", JSON.stringify(error.response.data, null, 2));
+    } else {
+      console.error("❌ Gemini API Error:", error.message);
+    }
+    throw new Error(`Failed to generate try-on image: ${error.response?.data?.error?.message || error.message}`);
   }
 }
 
@@ -92,43 +124,11 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
  * @returns {string} - The prompt for Gemini API
  */
 function createTryOnPrompt(clothingType) {
-  const basePrompt = `Create a professional virtual try-on image. Take the person from the first image and make them wear the clothing item from the second image.`;
-
-  const specificInstructions = {
-    top: `
-      - Replace the person's current top/shirt with the clothing item from the second image
-      - Ensure the clothing fits naturally on the person's body
-      - Maintain realistic lighting, shadows, and fabric folds
-      - Preserve the person's face, hair, skin tone, and body proportions exactly
-      - Keep the background and lower body (pants/skirt) unchanged
-      - Make the clothing look like it's naturally worn, following body contours
-      - Adjust the clothing size to fit the person's body realistically
-    `,
-    bottom: `
-      - Replace the person's current bottom/pants/skirt with the clothing item from the second image
-      - Ensure the clothing fits naturally on the person's lower body
-      - Maintain realistic lighting, shadows, and fabric folds
-      - Preserve the person's face, hair, skin tone, upper body, and body proportions exactly
-      - Keep the background and upper body (shirt/top) unchanged
-      - Make the clothing look like it's naturally worn, following body contours
-      - Adjust the clothing size to fit the person's body realistically
-    `,
-  };
-
-  const qualityInstructions = `
-    - Generate a high-quality, photorealistic image
-    - Ensure proper color matching and lighting consistency
-    - Maintain sharp details and natural textures
-    - The result should look like a professional fashion photograph
-  `;
-
-  return (
-    basePrompt +
-    "\n\nSpecific requirements:\n" +
-    (specificInstructions[clothingType] || specificInstructions.top) +
-    "\n\nQuality requirements:\n" +
-    qualityInstructions
-  );
+  if (clothingType === "top") {
+    return `Create a photorealistic virtual try-on image. Show the person from the first image wearing the clothing item (shirt/top) from the second image. Replace only their current top/shirt with the new clothing. Keep their face, hair, body, pants, and background exactly the same. Make the clothing fit naturally with realistic lighting, shadows, and fabric folds. The result should look like a professional fashion photograph.`;
+  } else {
+    return `Create a photorealistic virtual try-on image. Show the person from the first image wearing the clothing item (pants/bottom) from the second image. Replace only their current pants/bottom with the new clothing. Keep their face, hair, body, shirt/top, and background exactly the same. Make the clothing fit naturally with realistic lighting, shadows, and fabric folds. The result should look like a professional fashion photograph.`;
+  }
 }
 
 module.exports = { generateTryOnImage };
