@@ -1,6 +1,25 @@
 const axios = require("axios");
 const { GoogleAuth } = require("google-auth-library");
 const sharp = require("sharp");
+const fs = require("fs");
+const path = require("path");
+
+/**
+ * Setup Google Cloud credentials for Vercel/serverless environments
+ */
+function setupGoogleCredentials() {
+  // If credentials JSON is provided as environment variable (for Vercel)
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    const credPath = '/tmp/gcp-key.json';
+    try {
+      fs.writeFileSync(credPath, process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = credPath;
+      console.log("✅ Google Cloud credentials configured from JSON env var");
+    } catch (err) {
+      console.error("❌ Failed to write GCP credentials:", err.message);
+    }
+  }
+}
 
 /**
  * Generate virtual try-on image using Vertex AI Virtual Try-On (Nano Banana Pro)
@@ -11,6 +30,9 @@ const sharp = require("sharp");
  */
 async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothingType) {
   try {
+    // Setup credentials for serverless environments
+    setupGoogleCredentials();
+
     const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT_ID;
     const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
 

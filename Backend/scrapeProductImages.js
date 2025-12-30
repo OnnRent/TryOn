@@ -1,7 +1,17 @@
-const puppeteer = require("puppeteer");
+let puppeteer;
+try {
+  puppeteer = require("puppeteer");
+} catch (err) {
+  console.warn("⚠️ Puppeteer not available (likely on Vercel). Scraping features disabled.");
+}
 
 module.exports = async function scrapeProductImages(url) {
   console.log("🔍 Scraping images from:", url);
+
+  // Check if puppeteer is available
+  if (!puppeteer) {
+    throw new Error("Image scraping is not available on this deployment platform. Please use direct image upload instead.");
+  }
 
   let browser;
   try {

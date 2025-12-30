@@ -23,11 +23,15 @@
     "jsonwebtoken": "^9.0.3",
     "jwks-rsa": "^3.2.0",
     "multer": "^2.0.2",
-    "nodemon": "^3.1.11",
     "pg": "^8.16.3",
-    "puppeteer": "^24.34.0",
     "serverless-http": "^4.0.0",
     "sharp": "^0.34.5",
     "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  },
+  "optionalDependencies": {
+    "puppeteer": "^24.34.0"
   }
 }

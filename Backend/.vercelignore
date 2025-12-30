@@ -1,0 +1,8 @@
+node_modules/puppeteer
+node_modules/@puppeteer
+.env
+test_*.js
+*.html
+database_schema.sql
+check_database.js
+
