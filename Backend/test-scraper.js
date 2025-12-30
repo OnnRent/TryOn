@@ -1,4 +1,5 @@
 // Test script to debug scraping issues
+require('dotenv').config();
 const scrapeProductImages = require('./scrapeProductImages');
 
 const testUrl = process.argv[2] || 'https://dl.flipkart.com/s/vXo8vUNNNN';
