@@ -15,30 +15,28 @@ module.exports = async function scrapeProductImages(url) {
   if (!puppeteer) {
     console.log("📝 Puppeteer not available, using fallback scrapers");
 
-    // Try simple scraper first (free)
-    try {
-      console.log("🔄 Attempting simple scraper...");
-      const images = await scrapeProductImagesSimple(url);
-      if (images && images.length > 0) {
-        console.log("✅ Simple scraper succeeded");
-        return images;
-      }
-    } catch (simpleError) {
-      console.log("⚠️ Simple scraper failed:", simpleError.message);
+    // Use ScraperAPI if available (most reliable)
+    if (process.env.SCRAPER_API_KEY) {
+      console.log("🔄 Using ScraperAPI (premium scraper)...");
+      try {
+        return await scrapeProductImagesScraperAPI(url);
+      } catch (scraperApiError) {
+        console.error("❌ ScraperAPI failed:", scraperApiError.message);
+        console.log("🔄 Falling back to simple scraper...");
 
-      // Fallback to ScraperAPI if available
-      if (process.env.SCRAPER_API_KEY) {
-        console.log("🔄 Falling back to ScraperAPI...");
+        // Fallback to simple scraper
         try {
-          return await scrapeProductImagesScraperAPI(url);
-        } catch (scraperApiError) {
-          console.error("❌ ScraperAPI also failed:", scraperApiError.message);
-          throw new Error(`All scraping methods failed. Last error: ${scraperApiError.message}`);
+          return await scrapeProductImagesSimple(url);
+        } catch (simpleError) {
+          console.error("❌ Simple scraper also failed:", simpleError.message);
+          throw new Error(`All scraping methods failed. ScraperAPI: ${scraperApiError.message}, Simple: ${simpleError.message}`);
         }
-      } else {
-        console.log("💡 Tip: Set SCRAPER_API_KEY for premium scraping fallback");
-        throw simpleError;
       }
+    } else {
+      // No ScraperAPI key, use simple scraper
+      console.log("🔄 Using simple scraper (no ScraperAPI key set)...");
+      console.log("💡 Tip: Set SCRAPER_API_KEY for more reliable scraping");
+      return await scrapeProductImagesSimple(url);
     }
   }
 
