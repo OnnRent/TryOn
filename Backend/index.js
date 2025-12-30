@@ -117,19 +117,39 @@ app.post(
   ]),
   async (req, res) => {
     try {
+      console.log("📥 Received upload request");
+      console.log("Body:", req.body);
+      console.log("Files:", req.files);
+
       const { wardrobe_item_id } = req.body;
 
       if (!wardrobe_item_id) {
+        console.error("❌ Missing wardrobe_item_id");
         return res.status(400).json({ error: "wardrobe_item_id is required" });
       }
 
       const frontFile = req.files?.front?.[0];
       const backFile = req.files?.back?.[0];
 
+      console.log("Front file:", frontFile ? "✅" : "❌");
+      console.log("Back file:", backFile ? "✅" : "❌");
+
       if (!frontFile || !backFile) {
+        console.error("❌ Missing images - front:", !!frontFile, "back:", !!backFile);
         return res.status(400).json({
           error: "Both front and back images are required",
         });
+      }
+
+      // 🔴 VERIFY OWNERSHIP FIRST
+      const owner = await pool.query(
+        `SELECT 1 FROM wardrobe_items WHERE id = $1 AND user_id = $2`,
+        [wardrobe_item_id, req.userId]
+      );
+
+      if (owner.rows.length === 0) {
+        console.error("❌ Unauthorized - item doesn't belong to user");
+        return res.status(403).json({ error: "Unauthorized" });
       }
 
       // 🔴 CHECK IF ALREADY EXISTS
@@ -145,10 +165,13 @@ app.post(
       );
 
       if (existing.rows.length > 0) {
+        console.error("❌ Images already exist for this item");
         return res.status(400).json({
           error: "Images already uploaded for this item",
         });
       }
+
+      console.log("✅ Starting upload for both images...");
 
       // ✅ UPLOAD BOTH IMAGES
       const uploads = [
@@ -157,20 +180,37 @@ app.post(
       ];
 
       for (const img of uploads) {
+        console.log(`\n📸 Processing ${img.view} image...`);
         const imageId = uuidv4();
 
-        const bgRemovedBuffer = await removeBackground(img.file.buffer);
-
+        // Try background removal, fallback to original if it fails
+        let imageBuffer;
+        try {
+          if (process.env.REMOVEBGAPIKEY) {
+            console.log(`🎨 Removing background for ${img.view}...`);
+            imageBuffer = await removeBackground(img.file.buffer);
+            console.log(`✅ Background removed for ${img.view}`);
+          } else {
+            console.log("⚠️ No REMOVEBGAPIKEY found, skipping background removal");
+            imageBuffer = img.file.buffer;
+          }
+        } catch (bgError) {
+          console.error(`⚠️ Background removal failed for ${img.view}:`, bgError.message);
+          console.log("📸 Using original image instead");
+          imageBuffer = img.file.buffer;
+        }
 
         const s3Key = `raw/${req.userId}/wardrobe/${wardrobe_item_id}/${img.view}.jpg`;
+        console.log(`📤 Uploading ${img.view} to S3: ${s3Key}`);
 
         await s3.upload({
           Bucket: process.env.S3BUCKETNAME,
           Key: s3Key,
-        //   Body: img.file.buffer,
-          Body:bgRemovedBuffer,
+          Body: imageBuffer,
           ContentType: img.file.mimetype,
         }).promise();
+
+        console.log(`✅ ${img.view} uploaded to S3`);
 
         await pool.query(
             `
@@ -180,19 +220,11 @@ app.post(
             `,
             [imageId, wardrobe_item_id, req.userId, img.view, s3Key, "uploaded"]
             );
+
+        console.log(`✅ ${img.view} saved to database`);
       }
 
-      const owner = await pool.query(
-        `
-        SELECT 1 FROM wardrobe_items
-        WHERE id = $1 AND user_id = $2
-        `,
-        [wardrobe_item_id, req.userId]
-        );
-
-        if (owner.rows.length === 0) {
-        return res.status(403).json({ error: "Unauthorized" });
-        }
+      console.log("\n🎉 Both images uploaded successfully!");
 
 
       res.json({
@@ -291,15 +323,140 @@ app.get("/wardrobe/:wardrobe_item_id/images", verifyToken, async (req, res) => {
 
 
 app.get("/wardrobe", verifyToken, async (req, res) => {
-  const result = await pool.query(
-    `
-    SELECT id, category
-    FROM wardrobe_items
-    WHERE user_id = $1
-    `,
-    [req.userId]
-  );
-  res.json(result.rows);
+  try {
+    const { category } = req.query; // Optional filter by category
+
+    // Build query with optional category filter
+    let query = `
+      SELECT
+        wi.id,
+        wi.category,
+        wi.created_at,
+        json_agg(
+          json_build_object(
+            'view', wimg.view,
+            'path', COALESCE(wimg.processed_path, wimg.raw_path)
+          )
+        ) FILTER (WHERE wimg.id IS NOT NULL) as images
+      FROM wardrobe_items wi
+      LEFT JOIN wardrobe_images wimg ON wi.id = wimg.wardrobe_item_id
+      WHERE wi.user_id = $1
+    `;
+
+    const params = [req.userId];
+
+    if (category) {
+      query += ` AND wi.category = $2`;
+      params.push(category);
+    }
+
+    query += `
+      GROUP BY wi.id, wi.category, wi.created_at
+      ORDER BY wi.created_at DESC
+    `;
+
+    const result = await pool.query(query, params);
+
+    // Generate signed URLs for each image
+    const itemsWithSignedUrls = result.rows.map(item => {
+      const images = {};
+
+      if (item.images && item.images.length > 0) {
+        item.images.forEach(img => {
+          if (img.path) {
+            const signedUrl = s3.getSignedUrl("getObject", {
+              Bucket: process.env.S3BUCKETNAME,
+              Key: img.path,
+              Expires: 60 * 10, // 10 minutes
+            });
+            images[img.view] = signedUrl;
+          }
+        });
+      }
+
+      return {
+        id: item.id,
+        category: item.category,
+        created_at: item.created_at,
+        images,
+      };
+    });
+
+    res.json(itemsWithSignedUrls);
+  } catch (err) {
+    console.error("WARDROBE FETCH ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE wardrobe item and its images
+app.delete("/wardrobe/:itemId", verifyToken, async (req, res) => {
+  try {
+    const { itemId } = req.params;
+
+    console.log(`🗑️ Delete request for item: ${itemId}`);
+
+    // 1️⃣ Verify ownership
+    const owner = await pool.query(
+      `SELECT 1 FROM wardrobe_items WHERE id = $1 AND user_id = $2`,
+      [itemId, req.userId]
+    );
+
+    if (owner.rows.length === 0) {
+      console.error("❌ Unauthorized delete attempt");
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    // 2️⃣ Get all image paths from database
+    const images = await pool.query(
+      `SELECT COALESCE(processed_path, raw_path) as path
+       FROM wardrobe_images
+       WHERE wardrobe_item_id = $1`,
+      [itemId]
+    );
+
+    console.log(`📸 Found ${images.rows.length} images to delete from S3`);
+
+    // 3️⃣ Delete images from S3
+    for (const img of images.rows) {
+      if (img.path) {
+        try {
+          await s3.deleteObject({
+            Bucket: process.env.S3BUCKETNAME,
+            Key: img.path,
+          }).promise();
+          console.log(`✅ Deleted from S3: ${img.path}`);
+        } catch (s3Error) {
+          console.error(`⚠️ Failed to delete from S3: ${img.path}`, s3Error.message);
+          // Continue even if S3 delete fails
+        }
+      }
+    }
+
+    // 4️⃣ Delete from database
+    // First delete wardrobe_images (child records)
+    await pool.query(
+      `DELETE FROM wardrobe_images WHERE wardrobe_item_id = $1`,
+      [itemId]
+    );
+    console.log(`✅ Deleted wardrobe_images from database`);
+
+    // Then delete wardrobe_items (parent record)
+    await pool.query(
+      `DELETE FROM wardrobe_items WHERE id = $1`,
+      [itemId]
+    );
+    console.log(`✅ Deleted wardrobe_item from database`);
+
+    res.json({
+      success: true,
+      message: "Wardrobe item deleted successfully"
+    });
+
+  } catch (err) {
+    console.error("DELETE WARDROBE ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 
