@@ -460,8 +460,204 @@ app.delete("/wardrobe/:itemId", verifyToken, async (req, res) => {
 });
 
 
+// Scrape product images for immediate use (no wardrobe save)
+app.post("/scrape-product", verifyToken, async (req, res) => {
+  try {
+    const { product_url } = req.body;
+
+    console.log("🔍 Scrape product request:", product_url);
+
+    if (!product_url) {
+      return res.status(400).json({
+        error: "product_url is required"
+      });
+    }
+
+    // 1️⃣ Scrape images from product page
+    console.log("🔍 Scraping product images...");
+    const imageUrls = await scrapeProductImages(product_url);
+
+    if (imageUrls.length < 1) {
+      return res.status(400).json({
+        error: "Could not extract images from product page. Please try a different link."
+      });
+    }
+
+    console.log(`✅ Found ${imageUrls.length} images`);
+
+    // 2️⃣ Download, optimize, and return images as base64 (for immediate use)
+    const images = [];
+
+    for (let i = 0; i < Math.min(2, imageUrls.length); i++) {
+      console.log(`📥 Downloading image ${i + 1}...`);
+
+      const imageResponse = await axios.get(imageUrls[i], {
+        responseType: "arraybuffer",
+        timeout: 10000,
+      });
+
+      const imageBuffer = Buffer.from(imageResponse.data);
+
+      // Optimize image: convert to JPG with high quality, resize if too large
+      const optimizedBuffer = await sharp(imageBuffer)
+        .resize(1200, 1600, {
+          fit: 'inside',
+          withoutEnlargement: true, // Don't upscale small images
+        })
+        .jpeg({ quality: 95 }) // High quality JPEG
+        .toBuffer();
+
+      // Convert to base64 for easy transfer
+      const base64Image = optimizedBuffer.toString('base64');
+
+      images.push({
+        data: `data:image/jpeg;base64,${base64Image}`,
+        url: imageUrls[i],
+        size: optimizedBuffer.length
+      });
+
+      console.log(`✅ Image ${i + 1} downloaded and optimized (${(optimizedBuffer.length / 1024).toFixed(0)}KB)`);
+    }
+
+    console.log("🎉 Product images scraped successfully!");
+
+    res.json({
+      success: true,
+      images: images,
+      count: images.length
+    });
+
+  } catch (err) {
+    console.error("SCRAPE PRODUCT ERROR:", err);
+    res.status(500).json({
+      error: "Failed to scrape product images. Please check the URL and try again.",
+      details: err.message
+    });
+  }
+});
+
+
+// Import product from link (creates wardrobe item + scrapes images)
+app.post("/wardrobe/import-link", verifyToken, async (req, res) => {
+  try {
+    const { product_url, category } = req.body;
+
+    console.log("📦 Import from link request:", { product_url, category });
+
+    if (!product_url || !category) {
+      return res.status(400).json({
+        error: "product_url and category are required"
+      });
+    }
+
+    if (!["top", "bottom"].includes(category)) {
+      return res.status(400).json({
+        error: "category must be 'top' or 'bottom'"
+      });
+    }
+
+    // 1️⃣ Create wardrobe item
+    const wardrobeItemId = uuidv4();
+    await pool.query(
+      `INSERT INTO wardrobe_items (id, user_id, category) VALUES ($1, $2, $3)`,
+      [wardrobeItemId, req.userId, category]
+    );
+    console.log(`✅ Created wardrobe item: ${wardrobeItemId}`);
+
+    // 2️⃣ Scrape images from product page
+    console.log("🔍 Scraping product images...");
+    const imageUrls = await scrapeProductImages(product_url);
+
+    if (imageUrls.length < 2) {
+      // Cleanup: delete the wardrobe item if scraping fails
+      await pool.query(`DELETE FROM wardrobe_items WHERE id = $1`, [wardrobeItemId]);
+      return res.status(400).json({
+        error: "Could not extract enough images from product page. Please try a different link or upload manually."
+      });
+    }
+
+    console.log(`✅ Found ${imageUrls.length} images`);
+
+    const views = ["front", "back"];
+
+    // 3️⃣ Process each image
+    for (let i = 0; i < 2; i++) {
+      console.log(`\n📸 Processing ${views[i]} image...`);
+
+      // Download image
+      const imageResponse = await axios.get(imageUrls[i], {
+        responseType: "arraybuffer"
+      });
+      let imageBuffer = Buffer.from(imageResponse.data);
+
+      // Try background removal, fallback to original if it fails
+      try {
+        if (process.env.REMOVEBGAPIKEY) {
+          console.log(`🎨 Removing background for ${views[i]}...`);
+          imageBuffer = await removeBackground(imageBuffer);
+          console.log(`✅ Background removed for ${views[i]}`);
+        } else {
+          console.log("⚠️ No REMOVEBGAPIKEY found, skipping background removal");
+        }
+      } catch (bgError) {
+        console.error(`⚠️ Background removal failed for ${views[i]}:`, bgError.message);
+        console.log("📸 Using original image instead");
+      }
+
+      // Upload to S3
+      const s3Key = `raw/${req.userId}/wardrobe/${wardrobeItemId}/${views[i]}.jpg`;
+      console.log(`📤 Uploading ${views[i]} to S3: ${s3Key}`);
+
+      await s3.upload({
+        Bucket: process.env.S3BUCKETNAME,
+        Key: s3Key,
+        Body: imageBuffer,
+        ContentType: "image/jpeg"
+      }).promise();
+
+      console.log(`✅ ${views[i]} uploaded to S3`);
+
+      // Save to database
+      await pool.query(
+        `
+        INSERT INTO wardrobe_images
+        (id, wardrobe_item_id, user_id, view, raw_path, status)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        `,
+        [
+          uuidv4(),
+          wardrobeItemId,
+          req.userId,
+          views[i],
+          s3Key,
+          "uploaded"
+        ]
+      );
+
+      console.log(`✅ ${views[i]} saved to database`);
+    }
+
+    console.log("\n🎉 Product imported successfully!");
+
+    res.json({
+      success: true,
+      message: "Product imported successfully",
+      wardrobe_item_id: wardrobeItemId
+    });
+
+  } catch (err) {
+    console.error("IMPORT LINK ERROR:", err);
+    res.status(500).json({
+      error: "Failed to import product. Please try again or upload manually.",
+      details: err.message
+    });
+  }
+});
+
+
+// Legacy endpoint (kept for backward compatibility)
 app.post("/wardrobe/link", verifyToken, async (req, res) => {
-  try { // ✅ ADD THIS
+  try {
     const { wardrobe_item_id, product_url } = req.body;
 
     if (!wardrobe_item_id || !product_url) {
@@ -469,7 +665,7 @@ app.post("/wardrobe/link", verifyToken, async (req, res) => {
         error: "wardrobe_item_id and product_url are required"
       });
     }
-    
+
     // Verify ownership
     const owner = await pool.query(
       `SELECT 1 FROM wardrobe_items WHERE id = $1 AND user_id = $2`,
@@ -479,7 +675,7 @@ app.post("/wardrobe/link", verifyToken, async (req, res) => {
       return res.status(403).json({ error: "Unauthorized" });
     }
 
-    // 🔴 Check duplicate
+    // Check duplicate
     const existing = await pool.query(
       `SELECT 1 FROM wardrobe_images WHERE wardrobe_item_id = $1`,
       [wardrobe_item_id]
@@ -491,7 +687,7 @@ app.post("/wardrobe/link", verifyToken, async (req, res) => {
       });
     }
 
-    // 1️⃣ Scrape images
+    // Scrape images
     const imageUrls = await scrapeProductImages(product_url);
 
     if (imageUrls.length < 2) {
@@ -507,13 +703,13 @@ app.post("/wardrobe/link", verifyToken, async (req, res) => {
         responseType: "arraybuffer"
       });
 
-      // 2️⃣ Remove background
+      // Remove background
       const bgRemovedBuffer = await removeBackground(
         Buffer.from(imageBuffer.data)
       );
 
-      // 3️⃣ Upload to S3
-      const s3Key = `raw/${req.userId}/wardrobe/${wardrobe_item_id}/${views[i]}.png`; // ✅ ADD user_id to path
+      // Upload to S3
+      const s3Key = `raw/${req.userId}/wardrobe/${wardrobe_item_id}/${views[i]}.png`;
 
       await s3.upload({
         Bucket: process.env.S3BUCKETNAME,
@@ -522,7 +718,7 @@ app.post("/wardrobe/link", verifyToken, async (req, res) => {
         ContentType: "image/png"
       }).promise();
 
-      // 4️⃣ Insert DB
+      // Insert DB
       await pool.query(
         `
         INSERT INTO wardrobe_images
@@ -532,7 +728,7 @@ app.post("/wardrobe/link", verifyToken, async (req, res) => {
         [
           uuidv4(),
           wardrobe_item_id,
-          req.userId, // ✅ ADD user_id
+          req.userId,
           views[i],
           s3Key,
           "uploaded"

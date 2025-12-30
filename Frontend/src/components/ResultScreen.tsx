@@ -1,11 +1,13 @@
 import {
   View,
   FlatList,
-  Image,
   StyleSheet,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
+import { Image } from "expo-image";
 import { COLORS } from "../theme/colors";
+import { useState } from "react";
 
 const { width, height } = Dimensions.get("window");
 
@@ -14,6 +16,10 @@ type Props = {
 };
 
 export default function ResultScreen({ images }: Props) {
+  const [loadingStates, setLoadingStates] = useState<{ [key: number]: boolean }>(
+    images.reduce((acc, _, i) => ({ ...acc, [i]: true }), {})
+  );
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -22,12 +28,31 @@ export default function ResultScreen({ images }: Props) {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         keyExtractor={(_, i) => i.toString()}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <View style={styles.page}>
+            {loadingStates[index] && (
+              <ActivityIndicator
+                size="large"
+                color={COLORS.textPrimary}
+                style={styles.loader}
+              />
+            )}
             <Image
               source={{ uri: item }}
               style={styles.image}
-              resizeMode="contain"
+              contentFit="contain"
+              transition={200}
+              cachePolicy="memory-disk"
+              priority="high"
+              onLoadStart={() => {
+                setLoadingStates((prev) => ({ ...prev, [index]: true }));
+              }}
+              onLoad={() => {
+                setLoadingStates((prev) => ({ ...prev, [index]: false }));
+              }}
+              onError={() => {
+                setLoadingStates((prev) => ({ ...prev, [index]: false }));
+              }}
             />
           </View>
         )}
@@ -54,5 +79,12 @@ const styles = StyleSheet.create({
     width: width - 32,
     height: height * 0.75,
     borderRadius: 24,
+    // Prevent blurriness on high-DPI screens
+    backgroundColor: 'transparent',
+  },
+
+  loader: {
+    position: "absolute",
+    zIndex: 1,
   },
 });

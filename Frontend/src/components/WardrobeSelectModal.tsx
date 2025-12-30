@@ -5,13 +5,25 @@ import {
   TouchableOpacity,
   StyleSheet,
   FlatList,
+  Image,
+  ActivityIndicator,
 } from "react-native";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { COLORS } from "../theme/colors";
 import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
+type WardrobeItem = {
+  id: string;
+  category: "top" | "bottom";
+  created_at: string;
+  images: {
+    front?: string;
+    back?: string;
+  };
+};
 
 type Item = {
   id: string;
@@ -27,16 +39,6 @@ type Props = {
   }) => void;
 };
 
-const MOCK_TOPS: Item[] = Array.from({ length: 6 }).map((_, i) => ({
-  id: `top-${i}`,
-  uri: `https://picsum.photos/400/600?random=${i + 500}`,
-}));
-
-const MOCK_BOTTOMS: Item[] = Array.from({ length: 6 }).map((_, i) => ({
-  id: `bottom-${i}`,
-  uri: `https://picsum.photos/400/600?random=${i + 600}`,
-}));
-
 export default function WardrobeSelectModal({
   visible,
   onClose,
@@ -45,8 +47,55 @@ export default function WardrobeSelectModal({
   const [category, setCategory] = useState<"top" | "bottom">("top");
   const [selectedTop, setSelectedTop] = useState<Item | null>(null);
   const [selectedBottom, setSelectedBottom] = useState<Item | null>(null);
+  const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const data = category === "top" ? MOCK_TOPS : MOCK_BOTTOMS;
+  // Fetch wardrobe items when modal opens or category changes
+  useEffect(() => {
+    if (visible) {
+      fetchWardrobeItems();
+    }
+  }, [visible, category]);
+
+  async function fetchWardrobeItems() {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        console.error("No auth token found");
+        return;
+      }
+
+      const response = await fetch(
+        `http://localhost:3000/wardrobe?category=${category}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch wardrobe items");
+      }
+
+      const data = await response.json();
+      console.log(`📦 Loaded ${data.length} ${category} items for selection`);
+      setWardrobeItems(data);
+    } catch (error) {
+      console.error("Error fetching wardrobe:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Convert wardrobe items to selectable items
+  const data: Item[] = wardrobeItems
+    .filter((item) => item.images.front || item.images.back)
+    .map((item) => ({
+      id: item.id,
+      uri: item.images.front || item.images.back || "",
+    }));
 
   const canGenerate = selectedTop || selectedBottom;
 
@@ -118,32 +167,56 @@ export default function WardrobeSelectModal({
           </View>
 
           {/* Grid */}
-          <FlatList
-            data={data}
-            numColumns={2}
-            keyExtractor={(item) => item.id}
-            columnWrapperStyle={{ gap: 14 }}
-            contentContainerStyle={{ gap: 14, paddingBottom: 100 }}
-            renderItem={({ item }) => {
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.textPrimary} />
+              <Text style={styles.loadingText}>Loading {category}s...</Text>
+            </View>
+          ) : data.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons
+                name="shirt-outline"
+                size={48}
+                color={COLORS.textSecondary}
+              />
+              <Text style={styles.emptyText}>No {category}s yet</Text>
+              <Text style={styles.emptySubtext}>
+                Add items to your wardrobe first
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={data}
+              numColumns={2}
+              keyExtractor={(item) => item.id}
+              columnWrapperStyle={{ gap: 14 }}
+              contentContainerStyle={{ gap: 14, paddingBottom: 100 }}
+              renderItem={({ item }) => {
                 const isSelected =
-                    (category === "top" && selectedTop?.id === item.id) ||
-                    (category === "bottom" && selectedBottom?.id === item.id);
+                  (category === "top" && selectedTop?.id === item.id) ||
+                  (category === "bottom" && selectedBottom?.id === item.id);
 
                 return (
-                    <TouchableOpacity
-                    style={[
-                        styles.card,
-                        isSelected && styles.selectedCard,
-                    ]}
+                  <TouchableOpacity
+                    style={[styles.card, isSelected && styles.selectedCard]}
                     onPress={() => onSelect(item)}
                     activeOpacity={0.85}
-                    >
-                    <View style={styles.imagePlaceholder} />
-                    </TouchableOpacity>
+                  >
+                    <Image source={{ uri: item.uri }} style={styles.image} />
+                    {isSelected && (
+                      <View style={styles.checkmark}>
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={28}
+                          color="#4CAF50"
+                        />
+                      </View>
+                    )}
+                  </TouchableOpacity>
                 );
-                }}
-
-          />
+              }}
+            />
+          )}
 
           {/* Generate */}
           {canGenerate && (
@@ -221,19 +294,63 @@ const styles = StyleSheet.create({
     aspectRatio: 3 / 4,
     borderRadius: 18,
     backgroundColor: "#222",
+    overflow: "hidden",
+    position: "relative",
   },
 
   selectedCard: {
-    borderWidth: 2,
-    borderColor: "#7CFFB2",
+    borderWidth: 3,
+    borderColor: "#4CAF50",
   },
 
   disabledCard: {
     opacity: 0.25,
   },
 
-  imagePlaceholder: {
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+
+  checkmark: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 14,
+  },
+
+  loadingContainer: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+
+  emptyText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    marginTop: 16,
+  },
+
+  emptySubtext: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 6,
   },
 
   generateBtn: {
