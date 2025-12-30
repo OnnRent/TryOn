@@ -61,8 +61,10 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
 
     // Preprocess images: resize and optimize
     // Virtual Try-On API works best with high-quality images
+    // Use portrait orientation (768x1024) for better try-on results
     const processedPersonImage = await sharp(personImageBuffer)
-      .resize(1024, 1024, {
+      .rotate() // Auto-rotate based on EXIF orientation
+      .resize(768, 1024, {
         fit: "inside", // Maintain aspect ratio
         withoutEnlargement: true, // Don't upscale small images
       })
@@ -70,7 +72,8 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
       .toBuffer();
 
     const processedClothingImage = await sharp(clothingImageBuffer)
-      .resize(1024, 1024, {
+      .rotate() // Auto-rotate based on EXIF orientation
+      .resize(768, 1024, {
         fit: "inside",
         withoutEnlargement: true,
       })
@@ -147,7 +150,29 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
 
       if (prediction.bytesBase64Encoded) {
         console.log("✅ Successfully generated try-on image with Virtual Try-On");
-        return Buffer.from(prediction.bytesBase64Encoded, "base64");
+
+        // Convert base64 to buffer
+        const resultBuffer = Buffer.from(prediction.bytesBase64Encoded, "base64");
+
+        // Post-process: ensure portrait orientation and correct rotation
+        const processedResult = await sharp(resultBuffer)
+          .rotate() // Auto-rotate based on EXIF orientation
+          .toBuffer();
+
+        // Check if image is landscape and needs rotation
+        const metadata = await sharp(processedResult).metadata();
+        console.log(`📐 Result image dimensions: ${metadata.width}x${metadata.height}`);
+
+        // If width > height, the image is landscape - rotate it to portrait
+        if (metadata.width > metadata.height) {
+          console.log("🔄 Rotating landscape image to portrait orientation");
+          const rotatedResult = await sharp(processedResult)
+            .rotate(90)
+            .toBuffer();
+          return rotatedResult;
+        }
+
+        return processedResult;
       }
     }
 
