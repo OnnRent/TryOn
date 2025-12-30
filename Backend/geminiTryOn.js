@@ -19,6 +19,19 @@ function setupGoogleCredentials() {
       console.error("❌ Failed to write GCP credentials:", err.message);
     }
   }
+
+  // Log credential status
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    console.log("✅ Using credentials file:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
+    // Check if file exists
+    if (fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
+      console.log("✅ Credentials file exists");
+    } else {
+      console.error("❌ Credentials file not found:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
+    }
+  } else {
+    console.warn("⚠️ GOOGLE_APPLICATION_CREDENTIALS not set, will try default credentials");
+  }
 }
 
 /**
@@ -33,9 +46,10 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
     // Setup credentials for serverless environments
     setupGoogleCredentials();
 
-    const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT_ID;
+    const projectId = process.env.GCP_PROJECT_ID;
     const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
-
+    console.log("GCP_PROJECT_ID:", projectId);
+    console.log("GOOGLE_CLOUD_LOCATION:", location);
     if (!projectId) {
       throw new Error("GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID not found in environment variables");
     }
@@ -65,6 +79,10 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
     // Convert buffers to base64
     const personImageBase64 = processedPersonImage.toString("base64");
     const clothingImageBase64 = processedClothingImage.toString("base64");
+
+    console.log("🔑 Authenticating with Google Cloud...");
+    console.log("Person Image Base64:",personImageBase64);
+    console.log("Clothing Image Base64:",clothingImageBase64);
 
     // Get access token for Vertex AI
     const auth = new GoogleAuth({
