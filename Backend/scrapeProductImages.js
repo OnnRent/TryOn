@@ -2,18 +2,44 @@ let puppeteer;
 try {
   puppeteer = require("puppeteer");
 } catch (err) {
-  console.warn("⚠️ Puppeteer not available (likely on Vercel). Using simple scraper instead.");
+  console.warn("⚠️ Puppeteer not available (likely on Vercel). Using fallback scrapers.");
 }
 
 const scrapeProductImagesSimple = require("./scrapeProductImagesSimple");
+const scrapeProductImagesScraperAPI = require("./scrapeProductImagesScraperAPI");
 
 module.exports = async function scrapeProductImages(url) {
   console.log("🔍 Scraping images from:", url);
 
   // Check if puppeteer is available
   if (!puppeteer) {
-    console.log("📝 Using simple scraper (no Puppeteer)");
-    return scrapeProductImagesSimple(url);
+    console.log("📝 Puppeteer not available, using fallback scrapers");
+
+    // Try simple scraper first (free)
+    try {
+      console.log("🔄 Attempting simple scraper...");
+      const images = await scrapeProductImagesSimple(url);
+      if (images && images.length > 0) {
+        console.log("✅ Simple scraper succeeded");
+        return images;
+      }
+    } catch (simpleError) {
+      console.log("⚠️ Simple scraper failed:", simpleError.message);
+
+      // Fallback to ScraperAPI if available
+      if (process.env.SCRAPER_API_KEY) {
+        console.log("🔄 Falling back to ScraperAPI...");
+        try {
+          return await scrapeProductImagesScraperAPI(url);
+        } catch (scraperApiError) {
+          console.error("❌ ScraperAPI also failed:", scraperApiError.message);
+          throw new Error(`All scraping methods failed. Last error: ${scraperApiError.message}`);
+        }
+      } else {
+        console.log("💡 Tip: Set SCRAPER_API_KEY for premium scraping fallback");
+        throw simpleError;
+      }
+    }
   }
 
   let browser;
