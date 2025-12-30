@@ -205,16 +205,104 @@ export default function CameraScreen() {
 
             console.log(`✅ Scraped ${data.count} images from product`);
 
-            // Use the scraped images directly for generation
-            // TODO: Call AI generation API with photoUri (user photo) and data.images (product images)
+            // Now generate virtual try-on with the scraped clothing image
+            console.log("🎨 Starting virtual try-on generation...");
 
-            // For now, simulate generation and show the scraped images as result
-            setTimeout(() => {
-              // Use the scraped product images as the result
-              const scrapedImageUrls = data.images.map((img: any) => img.data);
-              setGeneratedImages(scrapedImageUrls);
-              setFlowState("RESULT");
-            }, 2000);
+            // Ask user to select clothing type
+            Alert.alert(
+              "Select Clothing Type",
+              "What type of clothing is this?",
+              [
+                {
+                  text: "Top (Shirt/T-shirt/Jacket)",
+                  onPress: async () => {
+                    await generateTryOn(data.images[0].data, "top");
+                  },
+                },
+                {
+                  text: "Bottom (Pants/Jeans/Skirt)",
+                  onPress: async () => {
+                    await generateTryOn(data.images[0].data, "bottom");
+                  },
+                },
+                {
+                  text: "Cancel",
+                  style: "cancel",
+                  onPress: () => setFlowState("CAPTURE"),
+                },
+              ]
+            );
+
+            // Helper function to generate try-on
+            async function generateTryOn(clothingImageData: string, clothingType: "top" | "bottom") {
+              try {
+                setFlowState("PROCESSING");
+
+                if (!photoUri) {
+                  throw new Error("No person photo found");
+                }
+
+                console.log(`🎨 Generating ${clothingType} try-on...`);
+
+                // Prepare form data - send base64 data directly
+                console.log("📦 Preparing form data...");
+                const formData = new FormData();
+
+                // Person image - direct URI from camera
+                // @ts-ignore - React Native FormData accepts file URIs
+                formData.append("person_image", {
+                  uri: photoUri,
+                  type: "image/jpeg",
+                  name: "person.jpg",
+                } as any);
+
+                // Clothing image - send as base64 string
+                // Backend will need to handle base64 decoding
+                const base64Data = clothingImageData.split(',')[1];
+                formData.append("clothing_image_base64", base64Data);
+
+                formData.append("clothing_type", clothingType);
+
+                console.log("✅ FormData prepared (person: file URI, clothing: base64)");
+
+                console.log("📤 Sending to virtual try-on API...");
+
+                const tryonResponse = await fetch("http://localhost:3000/tryon/generate", {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: formData,
+                });
+
+                const tryonData = await tryonResponse.json();
+                console.log("Response:", tryonResponse);
+
+                if (!tryonResponse.ok) {
+                  throw new Error(tryonData.error || "Virtual try-on failed");
+                }
+
+                console.log("✅ Virtual try-on completed!");
+                console.log(`Generation time: ${tryonData.generation_time_ms}ms`);
+
+                // Show the generated result
+                setGeneratedImages([tryonData.result_url]);
+                setFlowState("RESULT");
+
+              } catch (error: any) {
+                console.error("Virtual try-on error:", error);
+                Alert.alert(
+                  "Try-On Failed",
+                  error.message || "Could not generate virtual try-on. Please try again.",
+                  [
+                    {
+                      text: "OK",
+                      onPress: () => setFlowState("CAPTURE"),
+                    },
+                  ]
+                );
+              }
+            }
 
           } catch (error: any) {
             console.error("Scrape error:", error);
@@ -284,22 +372,32 @@ export default function CameraScreen() {
               throw new Error("No clothing image found");
             }
 
-            // Download clothing image
-            const clothingImageResponse = await fetch(clothingImageUrl);
-            const clothingBlob = await clothingImageResponse.blob();
-
-            // Prepare form data
+            // Prepare form data with file URIs (React Native way)
             const formData = new FormData();
 
-            // Add person image
-            const personResponse = await fetch(photoUri);
-            const personBlob = await personResponse.blob();
-            formData.append("person_image", personBlob, "person.jpg");
+            // Add person image - use file URI from camera
+            // @ts-ignore - React Native FormData accepts file URIs
+            formData.append("person_image", {
+              uri: photoUri,
+              type: "image/jpeg",
+              name: "person.jpg",
+            } as any);
 
-            // Add clothing image
-            formData.append("clothing_image", clothingBlob, "clothing.jpg");
+            // Add clothing image - use S3 URL directly
+            // @ts-ignore - React Native FormData accepts URLs
+            formData.append("clothing_image", {
+              uri: clothingImageUrl,
+              type: "image/jpeg",
+              name: "clothing.jpg",
+            } as any);
+
             formData.append("wardrobe_item_id", selectedItem.id);
             formData.append("clothing_type", clothingType);
+
+            console.log("📦 FormData prepared with URIs:", {
+              personUri: photoUri,
+              clothingUri: clothingImageUrl,
+            });
 
             console.log("📤 Sending to virtual try-on API...");
 
