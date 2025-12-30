@@ -1053,6 +1053,5 @@ app.post("/auth/dev", async (req, res) => {
   res.json({ token });
 });
 
-// Export handler for Vercel/AWS Lambda
+// Export handler for AWS Lambda
 module.exports = serverless(app);
-module.exports.handler = serverless(app);
