@@ -1,29 +1,11 @@
 // src/components/HomeNavbar.tsx
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { COLORS } from "../theme/colors";
-import { useAuth } from "../context/AuthContext";
+import { router } from "expo-router";
 
 export default function HomeNavbar() {
-  const { logout } = useAuth();
-
   function handleAvatarPress() {
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to sign out?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        {
-          text: "Sign Out",
-          style: "destructive",
-          onPress: async () => {
-            await logout();
-          }
-        }
-      ]
-    );
+    router.push("/profile");
   }
 
   return (
