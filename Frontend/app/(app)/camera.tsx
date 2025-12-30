@@ -1,6 +1,6 @@
 import { View, TouchableOpacity, StyleSheet, Text, Alert } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { COLORS } from "../../src/theme/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
@@ -27,8 +27,18 @@ export default function CameraScreen() {
   type CameraFlowState = "CAPTURE" | "PROCESSING" | "RESULT";
   const [flowState, setFlowState] = useState<CameraFlowState>("CAPTURE");
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+      }
+    };
+  }, []);
+
   if (!permission) {
     return <View style={{ flex: 1, backgroundColor: COLORS.background }} />;
   }
@@ -46,12 +56,43 @@ export default function CameraScreen() {
     );
   }
 
-  async function takePhoto() {
+  function startCountdown() {
+    // Clear any existing timer
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+    }
+
+    // Start countdown from 3
+    setCountdown(3);
+    let count = 3;
+
+    countdownTimerRef.current = setInterval(() => {
+      count -= 1;
+      if (count > 0) {
+        setCountdown(count);
+      } else {
+        // Countdown finished, take photo
+        clearInterval(countdownTimerRef.current!);
+        setCountdown(null);
+        takePhotoNow();
+      }
+    }, 1000);
+  }
+
+  async function takePhotoNow() {
     if (!cameraRef.current) return;
     const photo = await cameraRef.current.takePictureAsync({
       quality: 0.9,
     });
     setPhotoUri(photo.uri);
+  }
+
+  function cancelCountdown() {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+    setCountdown(null);
   }
 
   return (
@@ -73,11 +114,28 @@ export default function CameraScreen() {
           <>
             {/* Camera preview */}
             {!photoUri ? (
-              <CameraView
-                ref={cameraRef}
-                style={styles.camera}
-                facing={facing}
-              />
+              <>
+                <CameraView
+                  ref={cameraRef}
+                  style={styles.camera}
+                  facing={facing}
+                />
+
+                {/* Countdown Overlay */}
+                {countdown !== null && (
+                  <View style={styles.countdownOverlay}>
+                    <View style={styles.countdownCircle}>
+                      <Text style={styles.countdownText}>{countdown}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.cancelCountdownButton}
+                      onPress={cancelCountdown}
+                    >
+                      <Text style={styles.cancelCountdownText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
             ) : (
               <Image
                 source={{ uri: photoUri }}
@@ -97,7 +155,7 @@ export default function CameraScreen() {
                 <View style={styles.captureRow}>
                   {/* Capture */}
                   <TouchableOpacity
-                    onPress={takePhoto}
+                    onPress={startCountdown}
                     activeOpacity={0.9}
                     style={styles.captureOuter}
                   >
@@ -689,6 +747,48 @@ captureInner: {
   height: 58,
   borderRadius: 29,
   backgroundColor: "#fff",
+},
+
+// Countdown styles
+countdownOverlay: {
+  ...StyleSheet.absoluteFillObject,
+  backgroundColor: "rgba(0,0,0,0.7)",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 100,
+},
+
+countdownCircle: {
+  width: 150,
+  height: 150,
+  borderRadius: 75,
+  backgroundColor: "rgba(255,255,255,0.15)",
+  borderWidth: 4,
+  borderColor: "#fff",
+  alignItems: "center",
+  justifyContent: "center",
+  marginBottom: 30,
+},
+
+countdownText: {
+  fontSize: 72,
+  fontWeight: "bold",
+  color: "#fff",
+},
+
+cancelCountdownButton: {
+  paddingHorizontal: 24,
+  paddingVertical: 12,
+  borderRadius: 24,
+  backgroundColor: "rgba(255,255,255,0.2)",
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.3)",
+},
+
+cancelCountdownText: {
+  color: "#fff",
+  fontSize: 16,
+  fontWeight: "600",
 },
 
 });
