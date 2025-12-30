@@ -2,15 +2,18 @@ let puppeteer;
 try {
   puppeteer = require("puppeteer");
 } catch (err) {
-  console.warn("⚠️ Puppeteer not available (likely on Vercel). Scraping features disabled.");
+  console.warn("⚠️ Puppeteer not available (likely on Vercel). Using simple scraper instead.");
 }
+
+const scrapeProductImagesSimple = require("./scrapeProductImagesSimple");
 
 module.exports = async function scrapeProductImages(url) {
   console.log("🔍 Scraping images from:", url);
 
   // Check if puppeteer is available
   if (!puppeteer) {
-    throw new Error("Image scraping is not available on this deployment platform. Please use direct image upload instead.");
+    console.log("📝 Using simple scraper (no Puppeteer)");
+    return scrapeProductImagesSimple(url);
   }
 
   let browser;
@@ -36,28 +39,45 @@ module.exports = async function scrapeProductImages(url) {
 
     console.log("📄 Loading page...");
 
-    // Navigate to the page with timeout
-    await page.goto(url, {
-      waitUntil: 'networkidle2',
-      timeout: 30000
+    // Navigate to the page with timeout and follow redirects
+    const response = await page.goto(url, {
+      waitUntil: 'domcontentloaded', // Changed from networkidle2 for faster loading
+      timeout: 60000 // Increased timeout for redirects
     });
+
+    // Log the final URL after redirects
+    const finalUrl = page.url();
+    console.log(`📍 Final URL after redirects: ${finalUrl}`);
+
+    // Check if page loaded successfully
+    if (!response || !response.ok()) {
+      throw new Error(`Failed to load page. Status: ${response?.status() || 'unknown'}`);
+    }
 
     console.log("⏳ Waiting for images to load...");
 
     // Wait for images to appear (try multiple selectors)
     try {
       await Promise.race([
-        page.waitForSelector('img[src*="rukmini"]', { timeout: 10000 }), // Flipkart
-        page.waitForSelector('img[src*="images-amazon"]', { timeout: 10000 }), // Amazon
-        page.waitForSelector('img[src*="assets.myntassets"]', { timeout: 10000 }), // Myntra
-        page.waitForSelector('.product-image img', { timeout: 10000 }), // Generic
+        page.waitForSelector('img[src*="rukmini"]', { timeout: 15000 }), // Flipkart
+        page.waitForSelector('img[src*="images-amazon"]', { timeout: 15000 }), // Amazon
+        page.waitForSelector('img[src*="assets.myntassets"]', { timeout: 15000 }), // Myntra
+        page.waitForSelector('.product-image img', { timeout: 15000 }), // Generic
+        page.waitForSelector('img', { timeout: 15000 }), // Any image as fallback
       ]);
+      console.log("✅ Product images found");
     } catch (e) {
       console.log("⚠️ Specific selectors not found, trying generic approach...");
     }
 
     // Give extra time for lazy-loaded images
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 3000)); // Increased to 3 seconds
+
+    // Scroll to load lazy images
+    await page.evaluate(() => {
+      window.scrollTo(0, document.body.scrollHeight / 2);
+    });
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     console.log("🖼️ Extracting image URLs...");
 
@@ -104,6 +124,7 @@ module.exports = async function scrapeProductImages(url) {
       // Strategy 3: Look for images in common product gallery containers
       const gallerySelectors = [
         '._396cs4 img', // Flipkart gallery
+        '._2r_T1I img', // Flipkart alternative
         '.image-grid-image', // Myntra
         '#landingImage', // Amazon
         '.product-gallery img',
@@ -118,6 +139,16 @@ module.exports = async function scrapeProductImages(url) {
           }
         });
       });
+
+      // Strategy 4: Fallback - get all large images
+      if (imageUrls.size === 0) {
+        document.querySelectorAll('img').forEach(img => {
+          const src = img.src || img.dataset.src;
+          if (src && src.startsWith('http') && (img.width > 200 || img.naturalWidth > 200)) {
+            imageUrls.add(src);
+          }
+        });
+      }
 
       return Array.from(imageUrls);
     });
@@ -143,8 +174,15 @@ module.exports = async function scrapeProductImages(url) {
 
     console.log(`✅ Found ${cleanedImages.length} product images`);
 
+    // Log first image URL for debugging
+    if (cleanedImages.length > 0) {
+      console.log(`📸 First image: ${cleanedImages[0].substring(0, 100)}...`);
+    }
+
     if (cleanedImages.length === 0) {
-      throw new Error("No product images found on the page");
+      // Log all found images for debugging
+      console.log(`⚠️ All images found (${images.length}):`, images.slice(0, 5));
+      throw new Error("No product images found on the page. The page might be blocking scraping or using a different image structure.");
     }
 
     return cleanedImages;
