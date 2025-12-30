@@ -233,6 +233,41 @@ export default function CameraScreen() {
               ]
             );
 
+            // Helper function to poll job status
+            async function pollJobStatus(jobId: string, token: string): Promise<string> {
+              const maxAttempts = 60; // 60 attempts = 5 minutes max
+              const pollInterval = 5000; // 5 seconds
+
+              for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                console.log(`🔄 Polling attempt ${attempt + 1}/${maxAttempts}...`);
+
+                const statusResponse = await fetch(`http://localhost:3000/tryon/status/${jobId}`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+
+                if (!statusResponse.ok) {
+                  throw new Error("Failed to check job status");
+                }
+
+                const statusData = await statusResponse.json();
+                console.log(`Status: ${statusData.status}`);
+
+                if (statusData.status === "completed") {
+                  console.log("✅ Job completed!");
+                  return statusData.result_url;
+                }
+
+                if (statusData.status === "failed") {
+                  throw new Error(statusData.error_message || "Generation failed");
+                }
+
+                // Wait before next poll
+                await new Promise(resolve => setTimeout(resolve, pollInterval));
+              }
+
+              throw new Error("Job timed out. Please try again.");
+            }
+
             // Helper function to generate try-on
             async function generateTryOn(clothingImageData: string, clothingType: "top" | "bottom") {
               try {
@@ -257,14 +292,11 @@ export default function CameraScreen() {
                 } as any);
 
                 // Clothing image - send as base64 string
-                // Backend will need to handle base64 decoding
                 const base64Data = clothingImageData.split(',')[1];
                 formData.append("clothing_image_base64", base64Data);
-
                 formData.append("clothing_type", clothingType);
 
                 console.log("✅ FormData prepared (person: file URI, clothing: base64)");
-
                 console.log("📤 Sending to virtual try-on API...");
 
                 const tryonResponse = await fetch("http://localhost:3000/tryon/generate", {
@@ -276,17 +308,22 @@ export default function CameraScreen() {
                 });
 
                 const tryonData = await tryonResponse.json();
-                console.log("Response:", tryonResponse);
+                console.log("Response:", tryonData);
 
                 if (!tryonResponse.ok) {
                   throw new Error(tryonData.error || "Virtual try-on failed");
                 }
 
+                console.log(`✅ Job created: ${tryonData.generated_image_id}`);
+                console.log("⏳ Waiting for processing to complete...");
+
+                // Poll for completion
+                const resultUrl = await pollJobStatus(tryonData.generated_image_id, token!);
+
                 console.log("✅ Virtual try-on completed!");
-                console.log(`Generation time: ${tryonData.generation_time_ms}ms`);
 
                 // Show the generated result
-                setGeneratedImages([tryonData.result_url]);
+                setGeneratedImages([resultUrl]);
                 setFlowState("RESULT");
 
               } catch (error: any) {
@@ -416,10 +453,50 @@ export default function CameraScreen() {
               throw new Error(tryonData.message || "Virtual try-on failed");
             }
 
+            console.log(`✅ Job created: ${tryonData.generated_image_id}`);
+            console.log("⏳ Waiting for processing to complete...");
+
+            // Helper function to poll job status
+            async function pollJobStatus(jobId: string, token: string): Promise<string> {
+              const maxAttempts = 60;
+              const pollInterval = 5000;
+
+              for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                console.log(`🔄 Polling attempt ${attempt + 1}/${maxAttempts}...`);
+
+                const statusResponse = await fetch(`http://localhost:3000/tryon/status/${jobId}`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+
+                if (!statusResponse.ok) {
+                  throw new Error("Failed to check job status");
+                }
+
+                const statusData = await statusResponse.json();
+                console.log(`Status: ${statusData.status}`);
+
+                if (statusData.status === "completed") {
+                  console.log("✅ Job completed!");
+                  return statusData.result_url;
+                }
+
+                if (statusData.status === "failed") {
+                  throw new Error(statusData.error_message || "Generation failed");
+                }
+
+                await new Promise(resolve => setTimeout(resolve, pollInterval));
+              }
+
+              throw new Error("Job timed out. Please try again.");
+            }
+
+            // Poll for completion
+            const resultUrl = await pollJobStatus(tryonData.generated_image_id, token);
+
             console.log("✅ Virtual try-on completed!");
 
             // Show result
-            setGeneratedImages([tryonData.result_url]);
+            setGeneratedImages([resultUrl]);
             setFlowState("RESULT");
 
           } catch (error: any) {

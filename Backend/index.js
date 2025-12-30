@@ -293,7 +293,7 @@ app.post("/auth/logout", verifyToken, async (req, res) => {
   }
 });
 
-// Virtual Try-On Endpoint
+// Virtual Try-On Endpoint - ASYNC VERSION (Returns immediately, processes in background)
 app.post(
   "/tryon/generate",
   verifyToken,
@@ -302,7 +302,6 @@ app.post(
     { name: "clothing_image", maxCount: 1 },
   ]),
   async (req, res) => {
-    const startTime = Date.now();
     let generatedImageId = null;
 
     try {
@@ -333,11 +332,9 @@ app.post(
       let clothingImageBuffer;
 
       if (req.files?.clothing_image) {
-        // Clothing image uploaded as file
         clothingImageBuffer = req.files.clothing_image[0].buffer;
         console.log("📦 Clothing image received as file upload");
       } else if (req.body.clothing_image_base64) {
-        // Clothing image sent as base64 string
         console.log("📦 Clothing image received as base64 string");
         clothingImageBuffer = Buffer.from(req.body.clothing_image_base64, 'base64');
       } else {
@@ -348,15 +345,9 @@ app.post(
 
       console.log(`📊 Received buffers: Person=${personImageBuffer.length}B, Clothing=${clothingImageBuffer.length}B`);
 
-      if (personImageBuffer.length === 0) {
+      if (personImageBuffer.length === 0 || clothingImageBuffer.length === 0) {
         return res.status(400).json({
-          error: "Person image buffer is empty. Please ensure the image is properly uploaded.",
-        });
-      }
-
-      if (clothingImageBuffer.length === 0) {
-        return res.status(400).json({
-          error: "Clothing image buffer is empty. Please ensure the image is properly uploaded.",
+          error: "Image buffers are empty. Please ensure images are properly uploaded.",
         });
       }
 
@@ -383,73 +374,92 @@ app.post(
 
       console.log("✅ Source images uploaded");
 
-      // Create database record
+      // Create prompt for Gemini
+      const prompt = `Create a realistic virtual try-on image. Show the person wearing the ${clothing_type}. Maintain the person's pose, body shape, and background. The clothing should fit naturally and look realistic.`;
+
+      // Create database record with PENDING status
       generatedImageId = uuidv4();
       await pool.query(
         `INSERT INTO generated_images
-         (id, user_id, person_image_path, wardrobe_item_id, clothing_image_path, status)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+         (id, user_id, person_image_path, wardrobe_item_id, clothing_image_path, status, prompt_used)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           generatedImageId,
           req.userId,
           personImageKey,
           wardrobe_item_id || null,
           clothingImageKey,
-          "processing",
+          "pending",
+          prompt,
         ]
       );
 
-      console.log("🤖 Generating try-on image with Gemini API...");
+      console.log(`✅ Job created: ${generatedImageId} - Status: pending`);
 
-      // Generate try-on image using Gemini API
-      const generatedImageBuffer = await generateTryOnImage(
-        personImageBuffer,
-        clothingImageBuffer,
-        clothing_type
-      );
-
-      // Upload generated image to S3
-      const resultImageKey = `tryon/${req.userId}/results/${generatedImageId}.jpg`;
-
-      console.log("📤 Uploading generated image to S3...");
-
-      await s3.upload({
-        Bucket: process.env.S3BUCKETNAME,
-        Key: resultImageKey,
-        Body: generatedImageBuffer,
-        ContentType: "image/jpeg",
-      }).promise();
-
-      const generationTime = Date.now() - startTime;
-
-      // Update database record
-      await pool.query(
-        `UPDATE generated_images
-         SET result_image_path = $1, status = $2, generation_time_ms = $3, updated_at = NOW()
-         WHERE id = $4`,
-        [resultImageKey, "completed", generationTime, generatedImageId]
-      );
-
-      console.log(`✅ Try-on completed in ${generationTime}ms`);
-
-      // Generate signed URL for the result
-      const signedUrl = s3.getSignedUrl("getObject", {
-        Bucket: process.env.S3BUCKETNAME,
-        Key: resultImageKey,
-        Expires: 60 * 60 * 24, // 24 hours
-      });
-
+      // Return immediately with job ID
       res.json({
         success: true,
-        message: "Virtual try-on completed successfully",
+        message: "Virtual try-on job created. Processing in background.",
         generated_image_id: generatedImageId,
-        result_url: signedUrl,
-        generation_time_ms: generationTime,
+        status: "pending",
+        note: "Poll /tryon/status/:id to check progress"
       });
+
+      // Process in background (don't await)
+      setImmediate(async () => {
+        try {
+          console.log(`🔄 Starting background processing for: ${generatedImageId}`);
+
+          // Update to processing
+          await pool.query(
+            `UPDATE generated_images SET status = 'processing', updated_at = NOW() WHERE id = $1`,
+            [generatedImageId]
+          );
+
+          const startTime = Date.now();
+
+          // Generate try-on image using Gemini API
+          const generatedImageBuffer = await generateTryOnImage(
+            personImageBuffer,
+            clothingImageBuffer,
+            clothing_type
+          );
+
+          // Upload generated image to S3
+          const resultImageKey = `tryon/${req.userId}/results/${generatedImageId}.jpg`;
+
+          await s3.upload({
+            Bucket: process.env.S3BUCKETNAME,
+            Key: resultImageKey,
+            Body: generatedImageBuffer,
+            ContentType: "image/jpeg",
+          }).promise();
+
+          const generationTime = Date.now() - startTime;
+
+          // Update database record
+          await pool.query(
+            `UPDATE generated_images
+             SET result_image_path = $1, status = $2, generation_time_ms = $3, updated_at = NOW()
+             WHERE id = $4`,
+            [resultImageKey, "completed", generationTime, generatedImageId]
+          );
+
+          console.log(`✅ Background processing completed in ${generationTime}ms`);
+        } catch (bgError) {
+          console.error(`❌ Background processing error:`, bgError);
+          await pool.query(
+            `UPDATE generated_images
+             SET status = $1, error_message = $2, updated_at = NOW()
+             WHERE id = $3`,
+            ["failed", bgError.message, generatedImageId]
+          );
+        }
+      });
+
     } catch (err) {
       console.error("❌ VIRTUAL TRY-ON ERROR:", err);
 
-      // Update database with error
       if (generatedImageId) {
         await pool.query(
           `UPDATE generated_images
@@ -460,12 +470,62 @@ app.post(
       }
 
       res.status(500).json({
-        error: "Failed to generate virtual try-on",
+        error: "Failed to create virtual try-on job",
         message: err.message,
       });
     }
   }
 );
+
+// Check status of a virtual try-on job
+app.get("/tryon/status/:imageId", verifyToken, async (req, res) => {
+  try {
+    const { imageId } = req.params;
+
+    const result = await pool.query(
+      `SELECT
+        id,
+        status,
+        result_image_path,
+        error_message,
+        generation_time_ms,
+        created_at,
+        updated_at
+       FROM generated_images
+       WHERE id = $1 AND user_id = $2`,
+      [imageId, req.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const job = result.rows[0];
+
+    // If completed, generate signed URL
+    let resultUrl = null;
+    if (job.status === 'completed' && job.result_image_path) {
+      resultUrl = s3.getSignedUrl("getObject", {
+        Bucket: process.env.S3BUCKETNAME,
+        Key: job.result_image_path,
+        Expires: 60 * 60 * 24, // 24 hours
+      });
+    }
+
+    res.json({
+      id: job.id,
+      status: job.status,
+      result_url: resultUrl,
+      error_message: job.error_message,
+      generation_time_ms: job.generation_time_ms,
+      created_at: job.created_at,
+      updated_at: job.updated_at,
+    });
+  } catch (err) {
+    console.error("CHECK STATUS ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Get all generated try-on images for a user
 app.get("/tryon/images", verifyToken, async (req, res) => {
