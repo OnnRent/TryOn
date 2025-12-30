@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
+import { View, TouchableOpacity, StyleSheet, Text, Alert } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState } from "react";
 import { COLORS } from "../../src/theme/colors";
@@ -11,6 +11,7 @@ import WardrobeSelectModal from "@/src/components/WardrobeSelectModal";
 import ProcessingScreen from "../../src/components/ProcessingScreen";
 import ResultScreen from "../../src/components/ResultScreen";
 import { Image } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
 
@@ -171,20 +172,64 @@ export default function CameraScreen() {
           setShowWardrobeModal(true);
         }}
 
-        onSelectLink={(url) => {
-        setShowSelectModal(false);
-        setFlowState("PROCESSING");
+        onSelectLink={async (url) => {
+          setShowSelectModal(false);
+          setFlowState("PROCESSING");
 
-        setTimeout(() => {
-          setGeneratedImages([
-            "https://picsum.photos/600/900?random=921",
-            "https://picsum.photos/600/900?random=922",
-          ]);
-          setFlowState("RESULT");
-        }, 3000);
+          try {
+            const token = await AsyncStorage.getItem("token");
+            if (!token) {
+              Alert.alert("Error", "Please log in again");
+              setFlowState("CAPTURE");
+              return;
+            }
 
-        console.log("Product link:", url);
-      }}
+            console.log("🔍 Scraping product from link:", url);
+
+            const response = await fetch("http://localhost:3000/scrape-product", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                product_url: url,
+              }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(data.error || "Failed to scrape product");
+            }
+
+            console.log(`✅ Scraped ${data.count} images from product`);
+
+            // Use the scraped images directly for generation
+            // TODO: Call AI generation API with photoUri (user photo) and data.images (product images)
+
+            // For now, simulate generation and show the scraped images as result
+            setTimeout(() => {
+              // Use the scraped product images as the result
+              const scrapedImageUrls = data.images.map((img: any) => img.data);
+              setGeneratedImages(scrapedImageUrls);
+              setFlowState("RESULT");
+            }, 2000);
+
+          } catch (error: any) {
+            console.error("Scrape error:", error);
+            Alert.alert(
+              "Scraping Failed",
+              error.message || "Could not scrape product images. Please try a different link.",
+              [
+                {
+                  text: "OK",
+                  onPress: () => setFlowState("CAPTURE"),
+                },
+              ]
+            );
+          }
+        }}
 
       />
 

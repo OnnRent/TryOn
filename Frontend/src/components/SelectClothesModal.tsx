@@ -107,7 +107,7 @@ export default function SelectClothesModal({
                         />
                     </TouchableOpacity>
                     </View>
-                    
+
                     <View style={styles.linkActions}>
                         {/* Back */}
                         <TouchableOpacity
@@ -299,7 +299,33 @@ backText: {
   fontSize: 14,
 },
 
+categoryToggle: {
+  flexDirection: "row",
+  borderRadius: 12,
+  overflow: "hidden",
+  marginBottom: 14,
+  backgroundColor: "rgba(255,255,255,0.05)",
+},
 
+categoryTab: {
+  flex: 1,
+  paddingVertical: 10,
+  alignItems: "center",
+},
+
+categoryTabActive: {
+  backgroundColor: "rgba(255,255,255,0.12)",
+},
+
+categoryTabText: {
+  fontSize: 13,
+  fontWeight: "600",
+  color: COLORS.textSecondary,
+},
+
+categoryTabTextActive: {
+  color: COLORS.textPrimary,
+},
 
 });
 
