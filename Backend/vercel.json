@@ -1,18 +1,9 @@
 {
   "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "index.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxLambdaSize": "50mb"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/index.js"
+      "source": "/(.*)",
+      "destination": "/"
     }
   ],
   "functions": {
@@ -20,8 +11,5 @@
       "maxDuration": 60,
       "memory": 1024
     }
-  },
-  "env": {
-    "NODE_ENV": "production"
   }
 }
