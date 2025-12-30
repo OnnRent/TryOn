@@ -1,10 +1,12 @@
 const express = require("express");
 const app = express();
+
+// UUID v13+ is ESM-only, so we need to use dynamic import
 let uuidv4;
-(async () => {
-  const uuid = await import('uuid');
+const uuidPromise = import('uuid').then(uuid => {
   uuidv4 = uuid.v4;
-})();
+});
+
 const pool = require("./db");
 const multer = require("multer");
 const cors = require("cors");
@@ -18,6 +20,12 @@ const sharp = require("sharp");
 const { verifyAppleToken } = require("./auth/apple");
 const { createToken, verifyToken } = require("./auth/jwt");
 const serverless = require("serverless-http");
+
+// Middleware to ensure UUID is loaded before handling requests
+app.use(async (req, res, next) => {
+  await uuidPromise;
+  next();
+});
 
 
 
@@ -1058,4 +1066,4 @@ app.post("/auth/dev", async (req, res) => {
 });
 
 // Export handler for AWS Lambda
-module.exports.handler = serverless(app);
+module.exports = serverless(app);
