@@ -8,6 +8,7 @@ require("dotenv").config();
 const s3 = require("./s3");
 const removeBackground = require("./removeBackground");
 const scrapeProductImages = require("./scrapeProductImages");
+const { generateTryOnImage } = require("./geminiTryOn");
 const axios = require("axios");
 const { verifyAppleToken } = require("./auth/apple");
 const { createToken, verifyToken } = require("./auth/jwt");
@@ -284,6 +285,241 @@ app.post("/auth/logout", verifyToken, async (req, res) => {
     res.json({ message: "Logged out successfully" });
   } catch (err) {
     console.error("LOGOUT ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Virtual Try-On Endpoint
+app.post(
+  "/tryon/generate",
+  verifyToken,
+  upload.fields([
+    { name: "person_image", maxCount: 1 },
+    { name: "clothing_image", maxCount: 1 },
+  ]),
+  async (req, res) => {
+    const startTime = Date.now();
+    let generatedImageId = null;
+
+    try {
+      const { wardrobe_item_id, clothing_type } = req.body;
+
+      console.log("🎨 Virtual Try-On Request:", {
+        userId: req.userId,
+        wardrobeItemId: wardrobe_item_id,
+        clothingType: clothing_type,
+      });
+
+      // Validate inputs
+      if (!req.files?.person_image || !req.files?.clothing_image) {
+        return res.status(400).json({
+          error: "Both person_image and clothing_image are required",
+        });
+      }
+
+      if (!clothing_type || !["top", "bottom"].includes(clothing_type)) {
+        return res.status(400).json({
+          error: "clothing_type must be 'top' or 'bottom'",
+        });
+      }
+
+      const personImageBuffer = req.files.person_image[0].buffer;
+      const clothingImageBuffer = req.files.clothing_image[0].buffer;
+
+      // Upload original images to S3
+      const personImageKey = `tryon/${req.userId}/person/${uuidv4()}.jpg`;
+      const clothingImageKey = `tryon/${req.userId}/clothing/${uuidv4()}.jpg`;
+
+      console.log("📤 Uploading source images to S3...");
+
+      await Promise.all([
+        s3.upload({
+          Bucket: process.env.S3BUCKETNAME,
+          Key: personImageKey,
+          Body: personImageBuffer,
+          ContentType: "image/jpeg",
+        }).promise(),
+        s3.upload({
+          Bucket: process.env.S3BUCKETNAME,
+          Key: clothingImageKey,
+          Body: clothingImageBuffer,
+          ContentType: "image/jpeg",
+        }).promise(),
+      ]);
+
+      console.log("✅ Source images uploaded");
+
+      // Create database record
+      generatedImageId = uuidv4();
+      await pool.query(
+        `INSERT INTO generated_images
+         (id, user_id, person_image_path, wardrobe_item_id, clothing_image_path, status)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          generatedImageId,
+          req.userId,
+          personImageKey,
+          wardrobe_item_id || null,
+          clothingImageKey,
+          "processing",
+        ]
+      );
+
+      console.log("🤖 Generating try-on image with Gemini API...");
+
+      // Generate try-on image using Gemini API
+      const generatedImageBuffer = await generateTryOnImage(
+        personImageBuffer,
+        clothingImageBuffer,
+        clothing_type
+      );
+
+      // Upload generated image to S3
+      const resultImageKey = `tryon/${req.userId}/results/${generatedImageId}.jpg`;
+
+      console.log("📤 Uploading generated image to S3...");
+
+      await s3.upload({
+        Bucket: process.env.S3BUCKETNAME,
+        Key: resultImageKey,
+        Body: generatedImageBuffer,
+        ContentType: "image/jpeg",
+      }).promise();
+
+      const generationTime = Date.now() - startTime;
+
+      // Update database record
+      await pool.query(
+        `UPDATE generated_images
+         SET result_image_path = $1, status = $2, generation_time_ms = $3, updated_at = NOW()
+         WHERE id = $4`,
+        [resultImageKey, "completed", generationTime, generatedImageId]
+      );
+
+      console.log(`✅ Try-on completed in ${generationTime}ms`);
+
+      // Generate signed URL for the result
+      const signedUrl = s3.getSignedUrl("getObject", {
+        Bucket: process.env.S3BUCKETNAME,
+        Key: resultImageKey,
+        Expires: 60 * 60 * 24, // 24 hours
+      });
+
+      res.json({
+        success: true,
+        message: "Virtual try-on completed successfully",
+        generated_image_id: generatedImageId,
+        result_url: signedUrl,
+        generation_time_ms: generationTime,
+      });
+    } catch (err) {
+      console.error("❌ VIRTUAL TRY-ON ERROR:", err);
+
+      // Update database with error
+      if (generatedImageId) {
+        await pool.query(
+          `UPDATE generated_images
+           SET status = $1, error_message = $2, updated_at = NOW()
+           WHERE id = $3`,
+          ["failed", err.message, generatedImageId]
+        );
+      }
+
+      res.status(500).json({
+        error: "Failed to generate virtual try-on",
+        message: err.message,
+      });
+    }
+  }
+);
+
+// Get all generated try-on images for a user
+app.get("/tryon/images", verifyToken, async (req, res) => {
+  try {
+    const { limit = 20, offset = 0 } = req.query;
+
+    const result = await pool.query(
+      `SELECT
+        id,
+        person_image_path,
+        clothing_image_path,
+        result_image_path,
+        status,
+        created_at,
+        generation_time_ms
+       FROM generated_images
+       WHERE user_id = $1 AND status = 'completed'
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [req.userId, limit, offset]
+    );
+
+    // Generate signed URLs for all images
+    const images = result.rows.map((row) => {
+      let resultUrl = null;
+      if (row.result_image_path) {
+        resultUrl = s3.getSignedUrl("getObject", {
+          Bucket: process.env.S3BUCKETNAME,
+          Key: row.result_image_path,
+          Expires: 60 * 60 * 24, // 24 hours
+        });
+      }
+
+      return {
+        id: row.id,
+        result_url: resultUrl,
+        created_at: row.created_at,
+        generation_time_ms: row.generation_time_ms,
+      };
+    });
+
+    res.json({ images });
+  } catch (err) {
+    console.error("FETCH GENERATED IMAGES ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a generated image
+app.delete("/tryon/:imageId", verifyToken, async (req, res) => {
+  try {
+    const { imageId } = req.params;
+
+    // Get image paths
+    const result = await pool.query(
+      `SELECT person_image_path, clothing_image_path, result_image_path
+       FROM generated_images
+       WHERE id = $1 AND user_id = $2`,
+      [imageId, req.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Image not found" });
+    }
+
+    const { person_image_path, clothing_image_path, result_image_path } = result.rows[0];
+
+    // Delete from S3
+    const deletePromises = [person_image_path, clothing_image_path, result_image_path]
+      .filter(Boolean)
+      .map((key) =>
+        s3.deleteObject({
+          Bucket: process.env.S3BUCKETNAME,
+          Key: key,
+        }).promise()
+      );
+
+    await Promise.all(deletePromises);
+
+    // Delete from database
+    await pool.query(
+      `DELETE FROM generated_images WHERE id = $1`,
+      [imageId]
+    );
+
+    res.json({ message: "Generated image deleted successfully" });
+  } catch (err) {
+    console.error("DELETE GENERATED IMAGE ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });

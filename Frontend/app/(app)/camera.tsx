@@ -236,18 +236,107 @@ export default function CameraScreen() {
       <WardrobeSelectModal
         visible={showWardrobeModal}
         onClose={() => setShowWardrobeModal(false)}
-        onGenerate={(selection) => {
+        onGenerate={async (selection) => {
           setShowWardrobeModal(false);
           setFlowState("PROCESSING");
 
-          // TEMP: simulate AI generation
-          setTimeout(() => {
-            setGeneratedImages([
-              "https://picsum.photos/600/900?random=901", // front
-              "https://picsum.photos/600/900?random=902", // back
-            ]);
+          try {
+            const token = await AsyncStorage.getItem("token");
+            if (!token || !photoUri) {
+              Alert.alert("Error", "Missing photo or authentication");
+              setFlowState("CAPTURE");
+              return;
+            }
+
+            // Determine which item to use (top or bottom)
+            const selectedItem = selection.top || selection.bottom;
+            if (!selectedItem) {
+              Alert.alert("Error", "Please select a clothing item");
+              setFlowState("CAPTURE");
+              return;
+            }
+
+            const clothingType = selection.top ? "top" : "bottom";
+
+            console.log("🎨 Generating virtual try-on...", {
+              itemId: selectedItem.id,
+              type: clothingType,
+            });
+
+            // Fetch wardrobe item images
+            const wardrobeResponse = await fetch(
+              `http://localhost:3000/wardrobe/${selectedItem.id}/images`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            );
+
+            if (!wardrobeResponse.ok) {
+              throw new Error("Failed to fetch wardrobe images");
+            }
+
+            const wardrobeData = await wardrobeResponse.json();
+            const clothingImageUrl = wardrobeData.images.front || wardrobeData.images.back;
+
+            if (!clothingImageUrl) {
+              throw new Error("No clothing image found");
+            }
+
+            // Download clothing image
+            const clothingImageResponse = await fetch(clothingImageUrl);
+            const clothingBlob = await clothingImageResponse.blob();
+
+            // Prepare form data
+            const formData = new FormData();
+
+            // Add person image
+            const personResponse = await fetch(photoUri);
+            const personBlob = await personResponse.blob();
+            formData.append("person_image", personBlob, "person.jpg");
+
+            // Add clothing image
+            formData.append("clothing_image", clothingBlob, "clothing.jpg");
+            formData.append("wardrobe_item_id", selectedItem.id);
+            formData.append("clothing_type", clothingType);
+
+            console.log("📤 Sending to virtual try-on API...");
+
+            // Call virtual try-on API
+            const tryonResponse = await fetch("http://localhost:3000/tryon/generate", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+              body: formData,
+            });
+
+            const tryonData = await tryonResponse.json();
+
+            if (!tryonResponse.ok) {
+              throw new Error(tryonData.message || "Virtual try-on failed");
+            }
+
+            console.log("✅ Virtual try-on completed!");
+
+            // Show result
+            setGeneratedImages([tryonData.result_url]);
             setFlowState("RESULT");
-          }, 3000);
+
+          } catch (error: any) {
+            console.error("Virtual try-on error:", error);
+            Alert.alert(
+              "Try-On Failed",
+              error.message || "Could not generate virtual try-on. Please try again.",
+              [
+                {
+                  text: "OK",
+                  onPress: () => setFlowState("CAPTURE"),
+                },
+              ]
+            );
+          }
         }}
       />
     </View>
