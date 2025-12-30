@@ -2,11 +2,72 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 
+// Helper: Extract Flipkart product ID from URL
+function extractFlipkartProductId(url) {
+  // Extract from URL like: /p/itm123?pid=PRODUCT123
+  const pidMatch = url.match(/[?&]pid=([A-Z0-9]+)/);
+  if (pidMatch) return pidMatch[1];
+
+  // Extract from URL like: /p/itm123
+  const itmMatch = url.match(/\/p\/(itm[a-z0-9]+)/);
+  if (itmMatch) return itmMatch[1];
+
+  return null;
+}
+
+// Helper: Fetch images from Flipkart API
+async function fetchFlipkartAPI(productId) {
+  try {
+    const response = await axios.get(
+      `https://www.flipkart.com/api/4/product/share/${productId}`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
+          'X-User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15'
+        },
+        timeout: 10000
+      }
+    );
+
+    if (response.data?.productBaseInfo?.media?.images) {
+      return response.data.productBaseInfo.media.images
+        .map(img => {
+          let url = img.url;
+          // Upgrade to high-res
+          url = url.replace(/\/\d+\/\d+\//, '/832/832/');
+          url = url.split('?')[0] + '?q=90';
+          return url;
+        })
+        .slice(0, 4);
+    }
+  } catch (error) {
+    console.log('Flipkart API error:', error.message);
+  }
+  return [];
+}
+
 module.exports = async function scrapeProductImagesSimple(url) {
   console.log("🔍 Scraping images from:", url);
 
   try {
-    // Fetch the HTML
+    // Try Flipkart API first (faster and more reliable)
+    if (url.includes('flipkart.com')) {
+      try {
+        const productId = extractFlipkartProductId(url);
+        if (productId) {
+          console.log(`📦 Trying Flipkart API for product: ${productId}`);
+          const apiImages = await fetchFlipkartAPI(productId);
+          if (apiImages.length > 0) {
+            console.log(`✅ Got ${apiImages.length} images from Flipkart API`);
+            return apiImages;
+          }
+        }
+      } catch (apiError) {
+        console.log('⚠️ Flipkart API failed, falling back to HTML scraping');
+      }
+    }
+
+    // Fallback: Fetch the HTML
     const response = await axios.get(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -14,7 +75,9 @@ module.exports = async function scrapeProductImagesSimple(url) {
         'Accept-Language': 'en-US,en;q=0.5',
         'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
       },
       timeout: 30000,
       maxRedirects: 5

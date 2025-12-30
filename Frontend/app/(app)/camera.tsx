@@ -186,6 +186,7 @@ export default function CameraScreen() {
 
             console.log("🔍 Scraping product from link:", url);
 
+            // Use localhost for scraping (Puppeteer doesn't work on Vercel)
             const response = await fetch("https://try-on-xi.vercel.app/scrape-product", {
               method: "POST",
               headers: {
