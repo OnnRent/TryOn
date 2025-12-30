@@ -1,6 +1,10 @@
 const express = require("express");
 const app = express();
-const { v4: uuidv4 } = require('uuid');
+let uuidv4;
+(async () => {
+  const uuid = await import('uuid');
+  uuidv4 = uuid.v4;
+})();
 const pool = require("./db");
 const multer = require("multer");
 const cors = require("cors");
@@ -13,6 +17,9 @@ const axios = require("axios");
 const sharp = require("sharp");
 const { verifyAppleToken } = require("./auth/apple");
 const { createToken, verifyToken } = require("./auth/jwt");
+const serverless = require("serverless-http");
+
+
 
 
 
@@ -1049,3 +1056,6 @@ app.post("/auth/dev", async (req, res) => {
 
   res.json({ token });
 });
+
+// Export handler for AWS Lambda
+module.exports.handler = serverless(app);
