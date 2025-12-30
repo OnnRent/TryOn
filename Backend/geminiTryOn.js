@@ -10,6 +10,8 @@ const path = require("path");
 function setupGoogleCredentials() {
   // If credentials JSON is provided as environment variable (for Vercel)
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+
+    console.log("GOOGLE_APPLICATION_CREDENTIALS_JSON:", process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
     const credPath = '/tmp/gcp-key.json';
     try {
       fs.writeFileSync(credPath, process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
@@ -22,6 +24,7 @@ function setupGoogleCredentials() {
 
   // Log credential status
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    console.log("GOOGLE_APPLICATION_CREDENTIALS:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
     console.log("✅ Using credentials file:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
     // Check if file exists
     if (fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {

@@ -133,7 +133,7 @@ function toggleUpload() {
 async function createItem() {
   const category = document.getElementById("category").value;
 
-  const res = await fetch("http://localhost:3000/wardrobe/item", {
+  const res = await fetch("https://try-on-xi.vercel.app/wardrobe/item", {
     method: "POST",
     headers: {
     "Content-Type": "application/json",
@@ -165,7 +165,7 @@ async function uploadImages() {
 
   document.getElementById("uploadStatus").innerText = "Uploading...";
 
-  const res = await fetch("http://localhost:3000/wardrobe/image", {
+  const res = await fetch("https://try-on-xi.vercel.app/wardrobe/image", {
     method: "POST",
     headers: {
         Authorization: `Bearer ${authToken}`
@@ -201,7 +201,7 @@ async function uploadViaLink() {
   document.getElementById("linkStatus").innerText =
     "Fetching & processing images...";
 
-  const res = await fetch("http://localhost:3000/wardrobe/link", {
+  const res = await fetch("https://try-on-xi.vercel.app/wardrobe/link", {
     method: "POST",
     headers: {
     "Content-Type": "application/json",
@@ -226,7 +226,7 @@ async function uploadViaLink() {
 
 // STEP 3
 async function loadWardrobe() {
-  const res = await fetch("http://localhost:3000/wardrobe", {
+  const res = await fetch("https://try-on-xi.vercel.app/wardrobe", {
     headers: {
         Authorization: `Bearer ${authToken}`
     }
@@ -263,7 +263,7 @@ async function loadWardrobe() {
 //     return;
 //   }
 
-//   const res = await fetch("http://localhost:3000/auth/apple", {
+//   const res = await fetch("https://try-on-xi.vercel.app/auth/apple", {
 //     method: "POST",
 //     headers: { "Content-Type": "application/json" },
 //     body: JSON.stringify({ identityToken })
@@ -292,7 +292,7 @@ async function loadWardrobe() {
 // }
 
 async function login() {
-  const res = await fetch("http://localhost:3000/auth/dev", {
+  const res = await fetch("https://try-on-xi.vercel.app/auth/dev", {
     method: "POST"
   });
 
@@ -316,7 +316,7 @@ async function showImages(itemId, btn) {
   imagesDiv.innerText = "Loading images...";
 
   const res = await fetch(
-    `http://localhost:3000/wardrobe/${itemId}/images`,
+    `https://try-on-xi.vercel.app/wardrobe/${itemId}/images`,
     {
         headers: {
         Authorization: `Bearer ${authToken}`

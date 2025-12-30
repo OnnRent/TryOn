@@ -38,7 +38,7 @@ export default function WardrobeScreen() {
       }
 
       const response = await fetch(
-        `http://localhost:3000/wardrobe?category=${active}`,
+        `https://try-on-xi.vercel.app/wardrobe?category=${active}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -102,7 +102,7 @@ export default function WardrobeScreen() {
               }
 
               const response = await fetch(
-                `http://localhost:3000/wardrobe/${itemId}`,
+                `https://try-on-xi.vercel.app/wardrobe/${itemId}`,
                 {
                   method: "DELETE",
                   headers: {

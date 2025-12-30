@@ -8,7 +8,7 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 
-const BASE_URL = "http://localhost:3000";
+const BASE_URL = "https://try-on-xi.vercel.app";
 
 // You'll need to replace this with a real token
 const TEST_TOKEN = process.env.TEST_TOKEN || "your_jwt_token_here";

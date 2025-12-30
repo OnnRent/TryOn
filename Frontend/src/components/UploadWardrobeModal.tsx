@@ -40,7 +40,7 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
 
     console.log("🔑 Token exists:", !!token);
 
-    const res = await fetch("http://localhost:3000/wardrobe/item", {
+    const res = await fetch("https://try-on-xi.vercel.app/wardrobe/item", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -99,7 +99,7 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
     console.log("Front:", frontFilename, frontType);
     console.log("Back:", backFilename, backType);
 
-    const res = await fetch("http://localhost:3000/wardrobe/image", {
+    const res = await fetch("https://try-on-xi.vercel.app/wardrobe/image", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,

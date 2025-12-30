@@ -111,7 +111,7 @@ cd Backend
 npm run dev
 ```
 
-Server should start on `http://localhost:3000`
+Server should start on `https://try-on-xi.vercel.app`
 
 ### Start Frontend:
 

@@ -40,7 +40,7 @@ export default function ProfileScreen() {
         return;
       }
 
-      const response = await fetch("http://localhost:3000/auth/me", {
+      const response = await fetch("https://try-on-xi.vercel.app/auth/me", {
         headers: {
           Authorization: `Bearer ${token}`,
         },

@@ -67,7 +67,7 @@ export default function WardrobeSelectModal({
       }
 
       const response = await fetch(
-        `http://localhost:3000/wardrobe?category=${category}`,
+        `https://try-on-xi.vercel.app/wardrobe?category=${category}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

@@ -1,9 +1,7 @@
 // src/utils/api.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_URL = __DEV__ 
-  ? "http://localhost:3000"
-  : "https://your-production-url.com";
+const API_URL = "https://try-on-xi.vercel.app";
 
 export const api = {
   auth: {

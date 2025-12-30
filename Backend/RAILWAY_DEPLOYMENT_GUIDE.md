@@ -169,7 +169,7 @@ Update your frontend API URL to point to Railway:
 ```typescript
 // Frontend/src/utils/api.ts
 const API_URL = __DEV__ 
-  ? "http://localhost:3000"
+  ? "https://try-on-xi.vercel.app"
   : "https://your-railway-url.railway.app";
 ```
 

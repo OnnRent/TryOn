@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_URL = "http://localhost:3000";
+const API_URL = "https://try-on-xi.vercel.app";
 
 type GeneratedImage = {
   id: string;

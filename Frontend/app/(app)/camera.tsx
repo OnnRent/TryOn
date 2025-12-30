@@ -186,7 +186,7 @@ export default function CameraScreen() {
 
             console.log("🔍 Scraping product from link:", url);
 
-            const response = await fetch("http://localhost:3000/scrape-product", {
+            const response = await fetch("https://try-on-xi.vercel.app/scrape-product", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -233,15 +233,16 @@ export default function CameraScreen() {
               ]
             );
 
-            // Helper function to poll job status
+            // Helper function to poll job status with exponential backoff
             async function pollJobStatus(jobId: string, token: string): Promise<string> {
-              const maxAttempts = 60; // 60 attempts = 5 minutes max
-              const pollInterval = 5000; // 5 seconds
+              const maxAttempts = 40; // Reduced from 60
+              let pollInterval = 3000; // Start with 3 seconds
+              const maxInterval = 15000; // Max 15 seconds between polls
 
               for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                console.log(`🔄 Polling attempt ${attempt + 1}/${maxAttempts}...`);
+                console.log(`🔄 Polling attempt ${attempt + 1}/${maxAttempts}... (waiting ${pollInterval/1000}s)`);
 
-                const statusResponse = await fetch(`http://localhost:3000/tryon/status/${jobId}`, {
+                const statusResponse = await fetch(`https://try-on-xi.vercel.app/tryon/status/${jobId}`, {
                   headers: { Authorization: `Bearer ${token}` },
                 });
 
@@ -263,9 +264,15 @@ export default function CameraScreen() {
 
                 // Wait before next poll
                 await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+                // Exponential backoff: increase interval after first few attempts
+                // First 5 attempts: 3s, then gradually increase to 15s
+                if (attempt >= 5) {
+                  pollInterval = Math.min(pollInterval * 1.2, maxInterval);
+                }
               }
 
-              throw new Error("Job timed out. Please try again.");
+              throw new Error("Job timed out after 10 minutes. Please try again.");
             }
 
             // Helper function to generate try-on
@@ -299,7 +306,7 @@ export default function CameraScreen() {
                 console.log("✅ FormData prepared (person: file URI, clothing: base64)");
                 console.log("📤 Sending to virtual try-on API...");
 
-                const tryonResponse = await fetch("http://localhost:3000/tryon/generate", {
+                const tryonResponse = await fetch("https://try-on-xi.vercel.app/tryon/generate", {
                   method: "POST",
                   headers: {
                     Authorization: `Bearer ${token}`,
@@ -390,7 +397,7 @@ export default function CameraScreen() {
 
             // Fetch wardrobe item images
             const wardrobeResponse = await fetch(
-              `http://localhost:3000/wardrobe/${selectedItem.id}/images`,
+              `https://try-on-xi.vercel.app/wardrobe/${selectedItem.id}/images`,
               {
                 headers: {
                   Authorization: `Bearer ${token}`,
@@ -439,7 +446,7 @@ export default function CameraScreen() {
             console.log("📤 Sending to virtual try-on API...");
 
             // Call virtual try-on API
-            const tryonResponse = await fetch("http://localhost:3000/tryon/generate", {
+            const tryonResponse = await fetch("https://try-on-xi.vercel.app/tryon/generate", {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -456,15 +463,16 @@ export default function CameraScreen() {
             console.log(`✅ Job created: ${tryonData.generated_image_id}`);
             console.log("⏳ Waiting for processing to complete...");
 
-            // Helper function to poll job status
+            // Helper function to poll job status with exponential backoff
             async function pollJobStatus(jobId: string, token: string): Promise<string> {
-              const maxAttempts = 60;
-              const pollInterval = 5000;
+              const maxAttempts = 40; // Reduced from 60
+              let pollInterval = 3000; // Start with 3 seconds
+              const maxInterval = 15000; // Max 15 seconds between polls
 
               for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                console.log(`🔄 Polling attempt ${attempt + 1}/${maxAttempts}...`);
+                console.log(`🔄 Polling attempt ${attempt + 1}/${maxAttempts}... (waiting ${pollInterval/1000}s)`);
 
-                const statusResponse = await fetch(`http://localhost:3000/tryon/status/${jobId}`, {
+                const statusResponse = await fetch(`https://try-on-xi.vercel.app/tryon/status/${jobId}`, {
                   headers: { Authorization: `Bearer ${token}` },
                 });
 
@@ -485,9 +493,14 @@ export default function CameraScreen() {
                 }
 
                 await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+                // Exponential backoff: increase interval after first few attempts
+                if (attempt >= 5) {
+                  pollInterval = Math.min(pollInterval * 1.2, maxInterval);
+                }
               }
 
-              throw new Error("Job timed out. Please try again.");
+              throw new Error("Job timed out after 10 minutes. Please try again.");
             }
 
             // Poll for completion

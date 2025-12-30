@@ -35,7 +35,7 @@ export default function ImagesScreen() {
       }
 
       console.log("📡 Making API request to /tryon/images");
-      const response = await fetch("http://localhost:3000/tryon/images?limit=50", {
+      const response = await fetch("https://try-on-xi.vercel.app/tryon/images?limit=50", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
