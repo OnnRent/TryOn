@@ -26,9 +26,10 @@ const pool = new Pool({
   database: "wardrobe_db",
   password:process.env.DBPASSWORD,
   port: 5432,
-  ssl: {
+  // Only use SSL in production
+  ssl: process.env.NODE_ENV === "production" ? {
     rejectUnauthorized: false
-  }
+  } : false
 });
 
 exports.handler = async (event) => {

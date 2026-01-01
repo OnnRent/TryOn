@@ -6,6 +6,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +15,16 @@ import { router } from "expo-router";
 import { useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// Dynamically import Razorpay only if available (development build)
+let RazorpayCheckout: any = null;
+try {
+  RazorpayCheckout = require("react-native-razorpay").default;
+} catch (e) {
+  // Razorpay not available in Expo Go
+  console.log("Razorpay SDK not available - using fallback");
+}
+
+// Production API URL
 const API_URL = "https://api.tryonapp.in";
 
 type PricingTier = {
@@ -85,6 +96,7 @@ export default function PricingScreen() {
       }
 
       // Create Razorpay order
+      console.log("📤 Creating order for package:", tier.id);
       const orderResponse = await fetch(`${API_URL}/payment/create-order`, {
         method: "POST",
         headers: {
@@ -94,9 +106,21 @@ export default function PricingScreen() {
         body: JSON.stringify({ package_id: tier.id }),
       });
 
+      console.log("📥 Order Response:", {
+        status: orderResponse.status,
+        ok: orderResponse.ok,
+        headers: Object.fromEntries(orderResponse.headers.entries()),
+      });
+      console.log("Order Response:", orderResponse);
       if (!orderResponse.ok) {
-        const error = await orderResponse.json();
-        throw new Error(error.error || "Failed to create order");
+        const errorText = await orderResponse.text();
+        console.log("❌ Order creation failed:", orderResponse.status, errorText);
+        try {
+          const error = JSON.parse(errorText);
+          throw new Error(error.error || `Server error (${orderResponse.status}): ${error.message || 'Unknown error'}`);
+        } catch (e) {
+          throw new Error(`Server error (${orderResponse.status}): ${errorText.substring(0, 100) || 'No error message'}`);
+        }
       }
 
       const orderData = await orderResponse.json();
@@ -112,55 +136,58 @@ export default function PricingScreen() {
     }
   };
 
-  const openRazorpayCheckout = (orderData: any, tier: PricingTier, token: string) => {
-    // This is where you would integrate react-native-razorpay
-    // Install: npm install react-native-razorpay
-    // Then uncomment and use this code:
-
-    /*
-    import RazorpayCheckout from 'react-native-razorpay';
-
-    const options = {
-      description: `${tier.name} - ${tier.tryons} try-ons`,
-      image: 'https://your-logo-url.com/logo.png',
-      currency: orderData.currency,
-      key: orderData.key_id,
-      amount: orderData.amount,
-      name: 'TryOn',
-      order_id: orderData.order_id,
-      prefill: {
-        email: 'user@example.com',
-        contact: '9999999999',
-        name: 'User Name'
-      },
-      theme: { color: '#D4AF37' }
-    };
-
-    RazorpayCheckout.open(options)
-      .then((data) => {
-        verifyPayment(data, token);
-      })
-      .catch((error) => {
-        Alert.alert('Payment Failed', error.description || 'Payment was cancelled');
-      });
-    */
-
-    // Placeholder alert for now
-    Alert.alert(
-      "Payment Integration Ready",
-      `Order created successfully!\n\nOrder ID: ${orderData.order_id}\nAmount: ₹${tier.price}\n\nTo complete: Install react-native-razorpay and uncomment the code in pricing.tsx`,
-      [
-        {
-          text: "Test Verify",
-          onPress: () => {
-            // For testing, you can manually verify with dummy data
-            // In production, this will come from Razorpay SDK
-            Alert.alert("Info", "In production, payment verification will happen automatically after successful payment");
-          }
+  const openRazorpayCheckout = async (orderData: any, tier: PricingTier, token: string) => {
+    // Check if Razorpay SDK is available (development build)
+    if (RazorpayCheckout) {
+      // Use native Razorpay SDK
+      const options = {
+        description: `${tier.name} - ${tier.tryons} try-ons`,
+        image: 'https://your-logo-url.com/logo.png', // Replace with your app logo
+        currency: orderData.currency,
+        key: orderData.key_id,
+        amount: orderData.amount,
+        name: 'TryOn',
+        order_id: orderData.order_id,
+        prefill: {
+          email: 'user@example.com',
+          contact: '9999999999',
+          name: 'User Name'
         },
-        { text: "OK" }
-      ]
-    );
+        theme: { color: '#D4AF37' }
+      };
+
+      RazorpayCheckout.open(options)
+        .then((data: any) => {
+          // Payment successful - verify with backend
+          console.log("✅ Payment successful:", data);
+          verifyPayment(data, token);
+        })
+        .catch((error: any) => {
+          // Payment failed or cancelled
+          console.log("❌ Payment failed:", error);
+          if (error.code !== 0) { // 0 = user cancelled
+            Alert.alert('Payment Failed', error.description || 'Payment was cancelled');
+          }
+        });
+    } else {
+      // Fallback: Show error message for Expo Go users
+      Alert.alert(
+        "Development Build Required",
+        "To use Razorpay payments, you need to create a development build of this app.\n\nExpo Go doesn't support native payment modules.\n\nWould you like instructions on how to create a development build?",
+        [
+          {
+            text: "Show Instructions",
+            onPress: () => {
+              Alert.alert(
+                "Create Development Build",
+                "Run these commands:\n\n1. npx expo install expo-dev-client\n2. npx expo prebuild\n3. npx expo run:ios (or run:android)\n\nOr build with EAS:\neas build --profile development --platform ios"
+              );
+            }
+          },
+          { text: "Cancel", style: "cancel" }
+        ]
+      );
+    }
   };
 
   const verifyPayment = async (paymentData: any, token: string) => {
