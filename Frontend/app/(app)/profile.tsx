@@ -152,10 +152,25 @@ export default function ProfileScreen() {
           </BlurView>
         </View>
 
+        {/* Subscription Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Subscription</Text>
+
+          <TouchableOpacity onPress={() => router.push("/pricing")} activeOpacity={0.7}>
+            <BlurView intensity={20} tint="dark" style={styles.card}>
+              <View style={styles.cardItem}>
+                <Ionicons name="diamond-outline" size={20} color="#FFC107" />
+                <Text style={styles.cardLabel}>Pricing Plans</Text>
+                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+              </View>
+            </BlurView>
+          </TouchableOpacity>
+        </View>
+
         {/* Support Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Support</Text>
-          
+
           <TouchableOpacity onPress={handleSupport} activeOpacity={0.7}>
             <BlurView intensity={20} tint="dark" style={styles.card}>
               <View style={styles.cardItem}>

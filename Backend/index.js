@@ -49,11 +49,11 @@ app.post("/auth/apple", async (req, res) => {
     if (user.rows.length === 0) {
       user = await pool.query(
         `
-        INSERT INTO users (id, apple_user_id, email)
-        VALUES ($1, $2, $3)
+        INSERT INTO users (id, apple_user_id, email, available_tryons)
+        VALUES ($1, $2, $3, $4)
         RETURNING id
         `,
-        [uuidv4(), appleUserId, email]
+        [uuidv4(), appleUserId, email, 3]
       );
     }
 
@@ -260,7 +260,8 @@ app.post(
 app.get("/auth/me", verifyToken, async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT id, email, created_at FROM users WHERE id = $1",
+      `SELECT id, email, created_at, available_tryons
+       FROM users WHERE id = $1`,
       [req.userId]
     );
 
@@ -281,7 +282,8 @@ app.get("/auth/me", verifyToken, async (req, res) => {
         id: user.id,
         email: user.email,
         created_at: user.created_at,
-        wardrobe_count: parseInt(wardrobeCount.rows[0].count)
+        wardrobe_count: parseInt(wardrobeCount.rows[0].count),
+        available_tryons: user.available_tryons || 0,
       }
     });
   } catch (err) {
@@ -307,6 +309,55 @@ app.post("/auth/logout", verifyToken, async (req, res) => {
   }
 });
 
+// Purchase credits endpoint (placeholder for payment integration)
+app.post("/credits/purchase", verifyToken, async (req, res) => {
+  try {
+    const { package_id } = req.body;
+
+    // Define packages
+    const PACKAGES = {
+      free: { tryons: 3, price: 0 },
+      starter: { tryons: 15, price: 499 },
+      pro: { tryons: 25, price: 699 },
+    };
+
+    if (!PACKAGES[package_id]) {
+      return res.status(400).json({ error: "Invalid package ID" });
+    }
+
+    const pkg = PACKAGES[package_id];
+
+    // Free tier cannot be "purchased"
+    if (package_id === "free") {
+      return res.status(400).json({ error: "Free tier is automatically granted to new users" });
+    }
+
+    // TODO: Integrate with payment gateway (Razorpay, Stripe, etc.)
+    // For now, just add credits (in production, this should only happen after successful payment)
+
+    await pool.query(
+      `UPDATE users SET available_tryons = available_tryons + $1 WHERE id = $2`,
+      [pkg.tryons, req.userId]
+    );
+
+    // Get updated user data
+    const result = await pool.query(
+      `SELECT available_tryons FROM users WHERE id = $1`,
+      [req.userId]
+    );
+
+    res.json({
+      message: "Credits purchased successfully",
+      package: package_id,
+      tryons_added: pkg.tryons,
+      total_available: result.rows[0].available_tryons,
+    });
+  } catch (err) {
+    console.error("PURCHASE ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Virtual Try-On Endpoint - ASYNC VERSION (Returns immediately, processes in background)
 app.post(
   "/tryon/generate",
@@ -326,6 +377,27 @@ app.post(
         wardrobeItemId: wardrobe_item_id,
         clothingType: clothing_type,
       });
+
+      // Check available credits
+      const userResult = await pool.query(
+        `SELECT available_tryons FROM users WHERE id = $1`,
+        [req.userId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const user = userResult.rows[0];
+      const availableTryons = user.available_tryons || 0;
+
+      // Check if user has credits
+      if (availableTryons <= 0) {
+        return res.status(403).json({
+          error: "No try-ons available. Please purchase more credits to continue.",
+          available_tryons: 0,
+        });
+      }
 
       // Validate inputs
       if (!req.files?.person_image) {
@@ -457,6 +529,12 @@ app.post(
              SET result_image_path = $1, status = $2, generation_time_ms = $3, updated_at = NOW()
              WHERE id = $4`,
             [resultImageKey, "completed", generationTime, generatedImageId]
+          );
+
+          // Decrement available try-ons
+          await pool.query(
+            `UPDATE users SET available_tryons = available_tryons - 1 WHERE id = $1`,
+            [req.userId]
           );
 
           console.log(`✅ Background processing completed in ${generationTime}ms`);
