@@ -38,7 +38,7 @@ export default function WardrobeScreen() {
       }
 
       const response = await fetch(
-        `https://try-on-xi.vercel.app/wardrobe?category=${active}`,
+        `https://api.tryonapp.in/wardrobe?category=${active}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -102,7 +102,7 @@ export default function WardrobeScreen() {
               }
 
               const response = await fetch(
-                `https://try-on-xi.vercel.app/wardrobe/${itemId}`,
+                `https://api.tryonapp.in/wardrobe/${itemId}`,
                 {
                   method: "DELETE",
                   headers: {

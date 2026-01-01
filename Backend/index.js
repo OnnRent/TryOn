@@ -23,7 +23,7 @@ app.use(express.json());
 
 if (process.env.NODE_ENV !== "production") {
   app.listen(3000, () => {
-    console.log("Server running on https://try-on-xi.vercel.app");
+    console.log("Server running on https://api.tryonapp.in");
   });
 }
 

@@ -59,7 +59,7 @@ export default function SignInScreen() {
     setIsLoading(true);
     console.log("Attempting to sign in...");
     try {
-      const res = await fetch("https://try-on-xi.vercel.app/auth/dev", {
+      const res = await fetch("https://api.tryonapp.in/auth/dev", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

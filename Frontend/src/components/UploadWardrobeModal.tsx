@@ -53,7 +53,7 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
       }
 
       const response = await fetch(
-        "https://try-on-xi.vercel.app/wardrobe",
+        "https://api.tryonapp.in/wardrobe",
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -85,7 +85,7 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
 
     console.log("🔑 Token exists:", !!token);
 
-    const res = await fetch("https://try-on-xi.vercel.app/wardrobe/item", {
+    const res = await fetch("https://api.tryonapp.in/wardrobe/item", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -144,7 +144,7 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
     console.log("Front:", frontFilename, frontType);
     console.log("Back:", backFilename, backType);
 
-    const res = await fetch("https://try-on-xi.vercel.app/wardrobe/image", {
+    const res = await fetch("https://api.tryonapp.in/wardrobe/image", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
