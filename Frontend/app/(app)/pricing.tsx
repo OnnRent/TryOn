@@ -5,12 +5,16 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../src/theme/colors";
 import { router } from "expo-router";
-import { BlurView } from "expo-blur";
+import { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const API_URL = "https://api.tryonapp.in";
 
 type PricingTier = {
   id: string;
@@ -43,6 +47,9 @@ const PRICING_TIERS: PricingTier[] = [
 ];
 
 export default function PricingScreen() {
+  const [loading, setLoading] = useState(false);
+  const [processingPackage, setProcessingPackage] = useState<string | null>(null);
+
   const handleSelectPlan = (tier: PricingTier) => {
     if (tier.id === "free") {
       Alert.alert(
@@ -60,17 +67,150 @@ export default function PricingScreen() {
         { text: "Cancel", style: "cancel" },
         {
           text: "Purchase",
-          onPress: () => {
-            // TODO: Implement payment integration
-            Alert.alert("Coming Soon", "Payment integration will be added soon!");
-          },
+          onPress: () => initiatePayment(tier),
         },
       ]
     );
   };
 
+  const initiatePayment = async (tier: PricingTier) => {
+    try {
+      setLoading(true);
+      setProcessingPackage(tier.id);
+
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        Alert.alert("Error", "Please login to continue");
+        return;
+      }
+
+      // Create Razorpay order
+      const orderResponse = await fetch(`${API_URL}/payment/create-order`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ package_id: tier.id }),
+      });
+
+      if (!orderResponse.ok) {
+        const error = await orderResponse.json();
+        throw new Error(error.error || "Failed to create order");
+      }
+
+      const orderData = await orderResponse.json();
+
+      // Initialize Razorpay payment
+      openRazorpayCheckout(orderData, tier, token);
+    } catch (error: any) {
+      console.error("Payment initiation error:", error);
+      Alert.alert("Error", error.message || "Failed to initiate payment");
+    } finally {
+      setLoading(false);
+      setProcessingPackage(null);
+    }
+  };
+
+  const openRazorpayCheckout = (orderData: any, tier: PricingTier, token: string) => {
+    // This is where you would integrate react-native-razorpay
+    // Install: npm install react-native-razorpay
+    // Then uncomment and use this code:
+
+    /*
+    import RazorpayCheckout from 'react-native-razorpay';
+
+    const options = {
+      description: `${tier.name} - ${tier.tryons} try-ons`,
+      image: 'https://your-logo-url.com/logo.png',
+      currency: orderData.currency,
+      key: orderData.key_id,
+      amount: orderData.amount,
+      name: 'TryOn',
+      order_id: orderData.order_id,
+      prefill: {
+        email: 'user@example.com',
+        contact: '9999999999',
+        name: 'User Name'
+      },
+      theme: { color: '#D4AF37' }
+    };
+
+    RazorpayCheckout.open(options)
+      .then((data) => {
+        verifyPayment(data, token);
+      })
+      .catch((error) => {
+        Alert.alert('Payment Failed', error.description || 'Payment was cancelled');
+      });
+    */
+
+    // Placeholder alert for now
+    Alert.alert(
+      "Payment Integration Ready",
+      `Order created successfully!\n\nOrder ID: ${orderData.order_id}\nAmount: ₹${tier.price}\n\nTo complete: Install react-native-razorpay and uncomment the code in pricing.tsx`,
+      [
+        {
+          text: "Test Verify",
+          onPress: () => {
+            // For testing, you can manually verify with dummy data
+            // In production, this will come from Razorpay SDK
+            Alert.alert("Info", "In production, payment verification will happen automatically after successful payment");
+          }
+        },
+        { text: "OK" }
+      ]
+    );
+  };
+
+  const verifyPayment = async (paymentData: any, token: string) => {
+    try {
+      setLoading(true);
+
+      const response = await fetch(`${API_URL}/payment/verify`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(paymentData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Payment verification failed");
+      }
+
+      const result = await response.json();
+
+      Alert.alert(
+        "Success! 🎉",
+        `${result.tryons_added} try-ons added to your account!\n\nTotal available: ${result.total_available}`,
+        [
+          {
+            text: "OK",
+            onPress: () => router.back(),
+          },
+        ]
+      );
+    } catch (error: any) {
+      console.error("Payment verification error:", error);
+      Alert.alert("Error", error.message || "Failed to verify payment");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Loading Overlay */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#D4AF37" />
+          <Text style={styles.loadingText}>Processing payment...</Text>
+        </View>
+      )}
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -268,6 +408,23 @@ const styles = StyleSheet.create({
   footerDot: {
     fontSize: 13,
     color: "rgba(255,255,255,0.5)",
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 });
 
