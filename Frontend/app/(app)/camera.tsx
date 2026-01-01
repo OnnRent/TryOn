@@ -245,7 +245,7 @@ export default function CameraScreen() {
             console.log("🔍 Scraping product from link:", url);
 
             // Use localhost for scraping (Puppeteer doesn't work on Vercel)
-            const response = await fetch("https://try-on-xi.vercel.app/scrape-product", {
+            const response = await fetch("https://api.tryonapp.in/scrape-product", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -301,7 +301,7 @@ export default function CameraScreen() {
               for (let attempt = 0; attempt < maxAttempts; attempt++) {
                 console.log(`🔄 Polling attempt ${attempt + 1}/${maxAttempts}... (waiting ${pollInterval/1000}s)`);
 
-                const statusResponse = await fetch(`https://try-on-xi.vercel.app/tryon/status/${jobId}`, {
+                const statusResponse = await fetch(`https://api.tryonapp.in/tryon/status/${jobId}`, {
                   headers: { Authorization: `Bearer ${token}` },
                 });
 
@@ -365,7 +365,7 @@ export default function CameraScreen() {
                 console.log("✅ FormData prepared (person: file URI, clothing: base64)");
                 console.log("📤 Sending to virtual try-on API...");
 
-                const tryonResponse = await fetch("https://try-on-xi.vercel.app/tryon/generate", {
+                const tryonResponse = await fetch("https://api.tryonapp.in/tryon/generate", {
                   method: "POST",
                   headers: {
                     Authorization: `Bearer ${token}`,
@@ -456,7 +456,7 @@ export default function CameraScreen() {
 
             // Fetch wardrobe item images
             const wardrobeResponse = await fetch(
-              `https://try-on-xi.vercel.app/wardrobe/${selectedItem.id}/images`,
+              `https://api.tryonapp.in/wardrobe/${selectedItem.id}/images`,
               {
                 headers: {
                   Authorization: `Bearer ${token}`,
@@ -505,7 +505,7 @@ export default function CameraScreen() {
             console.log("📤 Sending to virtual try-on API...");
 
             // Call virtual try-on API
-            const tryonResponse = await fetch("https://try-on-xi.vercel.app/tryon/generate", {
+            const tryonResponse = await fetch("https://api.tryonapp.in/tryon/generate", {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -531,7 +531,7 @@ export default function CameraScreen() {
               for (let attempt = 0; attempt < maxAttempts; attempt++) {
                 console.log(`🔄 Polling attempt ${attempt + 1}/${maxAttempts}... (waiting ${pollInterval/1000}s)`);
 
-                const statusResponse = await fetch(`https://try-on-xi.vercel.app/tryon/status/${jobId}`, {
+                const statusResponse = await fetch(`https://api.tryonapp.in/tryon/status/${jobId}`, {
                   headers: { Authorization: `Bearer ${token}` },
                 });
 
