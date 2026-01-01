@@ -71,9 +71,27 @@ app.post("/wardrobe/item", verifyToken, async (req, res) => {
 
   try {
     const { category } = req.body;
+
+    // Check wardrobe limit (max 15 items)
+    const countResult = await pool.query(
+      `SELECT COUNT(*) as count FROM wardrobe_items WHERE user_id = $1`,
+      [req.userId]
+    );
+
+    const currentCount = parseInt(countResult.rows[0].count);
+    const MAX_WARDROBE_ITEMS = 15;
+
+    if (currentCount >= MAX_WARDROBE_ITEMS) {
+      return res.status(400).json({
+        error: `Wardrobe limit reached. You can only have ${MAX_WARDROBE_ITEMS} items. Please delete some items before adding new ones.`,
+        current_count: currentCount,
+        max_count: MAX_WARDROBE_ITEMS
+      });
+    }
+
     const id = uuidv4();
 
-    console.log("I am here");
+    console.log("Creating wardrobe item...");
 
     await pool.query(
         `
@@ -83,7 +101,7 @@ app.post("/wardrobe/item", verifyToken, async (req, res) => {
         [id, req.userId, category]
         );
 
-    console.log("Waiting");
+    console.log(`✅ Created wardrobe item: ${id} (${currentCount + 1}/${MAX_WARDROBE_ITEMS})`);
 
     res.json({ wardrobe_item_id: id });
   } catch (err) {
@@ -897,13 +915,30 @@ app.post("/wardrobe/import-link", verifyToken, async (req, res) => {
       });
     }
 
+    // Check wardrobe limit (max 15 items)
+    const countResult = await pool.query(
+      `SELECT COUNT(*) as count FROM wardrobe_items WHERE user_id = $1`,
+      [req.userId]
+    );
+
+    const currentCount = parseInt(countResult.rows[0].count);
+    const MAX_WARDROBE_ITEMS = 15;
+
+    if (currentCount >= MAX_WARDROBE_ITEMS) {
+      return res.status(400).json({
+        error: `Wardrobe limit reached. You can only have ${MAX_WARDROBE_ITEMS} items. Please delete some items before adding new ones.`,
+        current_count: currentCount,
+        max_count: MAX_WARDROBE_ITEMS
+      });
+    }
+
     // 1️⃣ Create wardrobe item
     const wardrobeItemId = uuidv4();
     await pool.query(
       `INSERT INTO wardrobe_items (id, user_id, category) VALUES ($1, $2, $3)`,
       [wardrobeItemId, req.userId, category]
     );
-    console.log(`✅ Created wardrobe item: ${wardrobeItemId}`);
+    console.log(`✅ Created wardrobe item: ${wardrobeItemId} (${currentCount + 1}/${MAX_WARDROBE_ITEMS})`);
 
     // 2️⃣ Scrape images from product page
     console.log("🔍 Scraping product images...");
