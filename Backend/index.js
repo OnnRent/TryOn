@@ -31,8 +31,10 @@ app.use("/payment/webhook", express.raw({ type: "application/json" }));
 app.use(express.json());
 
 if (process.env.NODE_ENV !== "production") {
-  app.listen(3000, () => {
-    console.log("Server running on https://api.tryonapp.in");
+  // Listen on all network interfaces (0.0.0.0) so mobile devices can connect
+  app.listen(3000, '0.0.0.0', () => {
+    console.log("Server running on http://0.0.0.0:3000");
+    console.log("Access from your phone at http://192.168.0.119:3000");
   });
 }
 
@@ -1352,9 +1354,90 @@ app.post("/wardrobe/link", verifyToken, async (req, res) => {
 });
 
 
+// For Testing - Mock payment endpoint (no database required)
+app.post("/payment/create-order-mock", verifyToken, async (req, res) => {
+  if (process.env.NODE_ENV !== "development") {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  try {
+    const { package_id } = req.body;
+
+    const PACKAGES = {
+      starter: { tryons: 15, price: 499 },
+      pro: { tryons: 25, price: 699 },
+    };
+
+    if (!PACKAGES[package_id]) {
+      return res.status(400).json({ error: "Invalid package ID" });
+    }
+
+    const pkg = PACKAGES[package_id];
+
+    // Mock Razorpay order response
+    const mockOrder = {
+      order_id: `order_mock_${Date.now()}`,
+      amount: pkg.price * 100,
+      currency: "INR",
+      key_id: process.env.RAZORPAY_KEY_ID || "rzp_test_mock",
+      package_id: package_id,
+      tryons: pkg.tryons,
+    };
+
+    res.json(mockOrder);
+  } catch (err) {
+    console.error("MOCK ORDER ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// For Testing - Mock payment verification (no database required)
+app.post("/payment/verify-mock", verifyToken, async (req, res) => {
+  if (process.env.NODE_ENV !== "development") {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  try {
+    const { razorpay_order_id } = req.body;
+
+    // Extract package info from order_id (in real scenario, this would come from database)
+    // For mock, we'll just return success with some credits
+    const mockResponse = {
+      success: true,
+      message: "Payment verified successfully (TEST MODE)",
+      tryons_added: 15,
+      total_available: 15,
+      order_id: razorpay_order_id,
+    };
+
+    console.log("✅ Mock payment verified:", mockResponse);
+    res.json(mockResponse);
+  } catch (err) {
+    console.error("MOCK VERIFY ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// For Testing - Generate a test token without database
+app.get("/auth/dev-token", async (req, res) => {
+  if (process.env.NODE_ENV !== "development") {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  // Generate a token for a mock user ID
+  const mockUserId = "dev-user-123";
+  const token = createToken(mockUserId);
+
+  res.json({
+    token,
+    message: "Use this token for local testing. Copy it and use it in your app.",
+    userId: mockUserId
+  });
+});
+
 // For Testing
 app.post("/auth/dev", async (req, res) => {
-  if (process.env.NODEENV !== "development") {
+  if (process.env.NODE_ENV !== "development") {
     return res.status(403).json({ error: "Forbidden" });
   }
 
