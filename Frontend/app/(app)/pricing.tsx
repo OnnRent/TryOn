@@ -5,29 +5,11 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  ActivityIndicator,
-  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../src/theme/colors";
 import { router } from "expo-router";
-import { useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// Dynamically import Razorpay only if available (development build)
-let RazorpayCheckout: any = null;
-try {
-  RazorpayCheckout = require("react-native-razorpay").default;
-} catch (e) {
-  // Razorpay not available in Expo Go
-  console.log("Razorpay SDK not available - using fallback");
-}
-
-// API URL - use local for testing, production for live
-const API_URL = __DEV__
-  ? "http://192.168.0.119:3000"  // Local backend with Razorpay credentials
-  : "https://api.tryonapp.in";   // Production (needs credentials on Vercel)
 
 type PricingTier = {
   id: string;
@@ -60,9 +42,6 @@ const PRICING_TIERS: PricingTier[] = [
 ];
 
 export default function PricingScreen() {
-  const [loading, setLoading] = useState(false);
-  const [processingPackage, setProcessingPackage] = useState<string | null>(null);
-
   const handleSelectPlan = (tier: PricingTier) => {
     if (tier.id === "free") {
       Alert.alert(
@@ -74,172 +53,14 @@ export default function PricingScreen() {
     }
 
     Alert.alert(
-      `${tier.name}`,
-      `Purchase ${tier.tryons} try-ons for ₹${tier.price}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Purchase",
-          onPress: () => initiatePayment(tier),
-        },
-      ]
+      "Coming Soon",
+      `Payment integration for ${tier.name} (₹${tier.price}) will be available soon!\n\nYou'll get ${tier.tryons} try-ons.`,
+      [{ text: "OK" }]
     );
-  };
-
-  const initiatePayment = async (tier: PricingTier) => {
-    try {
-      setLoading(true);
-      setProcessingPackage(tier.id);
-
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        Alert.alert("Error", "Please login to continue");
-        return;
-      }
-
-      // Create Razorpay order
-      console.log("📤 Creating order for package:", tier.id);
-      const orderResponse = await fetch(`${API_URL}/payment/create-order`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ package_id: tier.id }),
-      });
-
-      console.log("📥 Order Response:", {
-        status: orderResponse.status,
-        ok: orderResponse.ok,
-        headers: Object.fromEntries(orderResponse.headers.entries()),
-      });
-      console.log("Order Response:", orderResponse);
-      if (!orderResponse.ok) {
-        const errorText = await orderResponse.text();
-        console.log("❌ Order creation failed:", orderResponse.status, errorText);
-        try {
-          const error = JSON.parse(errorText);
-          throw new Error(error.error || `Server error (${orderResponse.status}): ${error.message || 'Unknown error'}`);
-        } catch (e) {
-          throw new Error(`Server error (${orderResponse.status}): ${errorText.substring(0, 100) || 'No error message'}`);
-        }
-      }
-
-      const orderData = await orderResponse.json();
-
-      // Initialize Razorpay payment
-      openRazorpayCheckout(orderData, tier, token);
-    } catch (error: any) {
-      console.error("Payment initiation error:", error);
-      Alert.alert("Error", error.message || "Failed to initiate payment");
-    } finally {
-      setLoading(false);
-      setProcessingPackage(null);
-    }
-  };
-
-  const openRazorpayCheckout = async (orderData: any, tier: PricingTier, token: string) => {
-    // Check if Razorpay SDK is available (development build)
-    if (RazorpayCheckout) {
-      // Use native Razorpay SDK
-      const options = {
-        description: `${tier.name} - ${tier.tryons} try-ons`,
-        image: 'https://your-logo-url.com/logo.png', // Replace with your app logo
-        currency: orderData.currency,
-        key: orderData.key_id,
-        amount: orderData.amount,
-        name: 'TryOn',
-        order_id: orderData.order_id,
-        prefill: {
-          email: 'user@example.com',
-          contact: '9999999999',
-          name: 'User Name'
-        },
-        theme: { color: '#D4AF37' }
-      };
-
-      RazorpayCheckout.open(options)
-        .then((data: any) => {
-          // Payment successful - verify with backend
-          console.log("✅ Payment successful:", data);
-          verifyPayment(data, token);
-        })
-        .catch((error: any) => {
-          // Payment failed or cancelled
-          console.log("❌ Payment failed:", error);
-          if (error.code !== 0) { // 0 = user cancelled
-            Alert.alert('Payment Failed', error.description || 'Payment was cancelled');
-          }
-        });
-    } else {
-      // Fallback: Show error message for Expo Go users
-      Alert.alert(
-        "Development Build Required",
-        "To use Razorpay payments, you need to create a development build of this app.\n\nExpo Go doesn't support native payment modules.\n\nWould you like instructions on how to create a development build?",
-        [
-          {
-            text: "Show Instructions",
-            onPress: () => {
-              Alert.alert(
-                "Create Development Build",
-                "Run these commands:\n\n1. npx expo install expo-dev-client\n2. npx expo prebuild\n3. npx expo run:ios (or run:android)\n\nOr build with EAS:\neas build --profile development --platform ios"
-              );
-            }
-          },
-          { text: "Cancel", style: "cancel" }
-        ]
-      );
-    }
-  };
-
-  const verifyPayment = async (paymentData: any, token: string) => {
-    try {
-      setLoading(true);
-
-      const response = await fetch(`${API_URL}/payment/verify`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(paymentData),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Payment verification failed");
-      }
-
-      const result = await response.json();
-
-      Alert.alert(
-        "Success! 🎉",
-        `${result.tryons_added} try-ons added to your account!\n\nTotal available: ${result.total_available}`,
-        [
-          {
-            text: "OK",
-            onPress: () => router.back(),
-          },
-        ]
-      );
-    } catch (error: any) {
-      console.error("Payment verification error:", error);
-      Alert.alert("Error", error.message || "Failed to verify payment");
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Loading Overlay */}
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#D4AF37" />
-          <Text style={styles.loadingText}>Processing payment...</Text>
-        </View>
-      )}
-
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -438,22 +259,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "rgba(255,255,255,0.5)",
   },
-  loadingOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1000,
-    gap: 16,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: "#FFFFFF",
-    fontWeight: "600",
-  },
 });
-
