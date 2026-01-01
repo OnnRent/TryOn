@@ -32,6 +32,10 @@ CREATE INDEX IF NOT EXISTS idx_generated_images_created_at ON generated_images(c
 -- Add avatar_path column to users table if it doesn't exist
 ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_path TEXT;
 
+-- Add credits column to users table (credit-based system)
+-- New users get 3 free try-ons by default
+ALTER TABLE users ADD COLUMN IF NOT EXISTS available_tryons INTEGER DEFAULT 3;
+
 -- Table for tracking API usage (optional but recommended)
 CREATE TABLE IF NOT EXISTS api_usage (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
