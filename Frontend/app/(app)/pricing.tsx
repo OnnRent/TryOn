@@ -24,8 +24,10 @@ try {
   console.log("Razorpay SDK not available - using fallback");
 }
 
-// Production API URL
-const API_URL = "https://api.tryonapp.in";
+// API URL - use local for testing, production for live
+const API_URL = __DEV__
+  ? "http://192.168.0.119:3000"  // Local backend with Razorpay credentials
+  : "https://api.tryonapp.in";   // Production (needs credentials on Vercel)
 
 type PricingTier = {
   id: string;
