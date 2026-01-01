@@ -36,6 +36,23 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_path TEXT;
 -- New users get 3 free try-ons by default
 ALTER TABLE users ADD COLUMN IF NOT EXISTS available_tryons INTEGER DEFAULT 3;
 
+-- Table for tracking payment orders
+CREATE TABLE IF NOT EXISTS payment_orders (
+  id VARCHAR(255) PRIMARY KEY,  -- Razorpay order ID
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  package_id VARCHAR(50) NOT NULL,  -- 'starter', 'pro', etc.
+  amount INTEGER NOT NULL,  -- Amount in INR
+  tryons INTEGER NOT NULL,  -- Number of try-ons purchased
+  status VARCHAR(50) DEFAULT 'created',  -- created, completed, failed
+  payment_id VARCHAR(255),  -- Razorpay payment ID
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_orders_user_id ON payment_orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_payment_orders_status ON payment_orders(status);
+CREATE INDEX IF NOT EXISTS idx_payment_orders_created_at ON payment_orders(created_at DESC);
+
 -- Table for tracking API usage (optional but recommended)
 CREATE TABLE IF NOT EXISTS api_usage (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
