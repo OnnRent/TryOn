@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator } from "react-native";
 import { BlurView } from "expo-blur";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { COLORS } from "../theme/colors";
 import CategorySelector from "./CategorySelector";
 import UploadImageCard from "./UploadImageCard";
@@ -11,11 +11,14 @@ import {
 } from "../utils/permissions";
 import { Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
   visible: boolean;
   onClose: () => void;
 };
+
+const MAX_WARDROBE_ITEMS = 15;
 
 export default function UploadWardrobeModal({ visible, onClose }: Props) {
   const [category, setCategory] = useState<"top" | "bottom">("top");
@@ -23,11 +26,53 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
   const [backImage, setBackImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>("");
+  const [totalItems, setTotalItems] = useState<number>(0);
+  const [loadingCount, setLoadingCount] = useState(true);
 
-  const canUpload = frontImage && backImage && !uploading;
+  const canUpload = frontImage && backImage && !uploading && totalItems < MAX_WARDROBE_ITEMS;
+
+  // Fetch total wardrobe count when modal opens
+  useEffect(() => {
+    if (visible) {
+      fetchTotalWardrobeCount();
+    }
+  }, [visible]);
 
   async function getAuthToken() {
     return AsyncStorage.getItem("token");
+  }
+
+  // Fetch total wardrobe item count
+  async function fetchTotalWardrobeCount() {
+    try {
+      setLoadingCount(true);
+      const token = await getAuthToken();
+      if (!token) {
+        console.error("No auth token found");
+        return;
+      }
+
+      const response = await fetch(
+        "https://try-on-xi.vercel.app/wardrobe",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch wardrobe items");
+      }
+
+      const data = await response.json();
+      setTotalItems(data.length);
+      console.log(`📊 Total wardrobe items: ${data.length}/${MAX_WARDROBE_ITEMS}`);
+    } catch (error) {
+      console.error("Error fetching wardrobe count:", error);
+    } finally {
+      setLoadingCount(false);
+    }
   }
 
   // STEP 1: Create wardrobe item
@@ -170,6 +215,16 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
 
 
   async function pickImage(type: "front" | "back") {
+    // Check if limit is reached
+    if (totalItems >= MAX_WARDROBE_ITEMS) {
+      Alert.alert(
+        "Wardrobe Full",
+        `You've reached the maximum limit of ${MAX_WARDROBE_ITEMS} wardrobe items. Please delete some items before uploading new ones.`,
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
     Alert.alert("Select Image", "Choose image source", [
         {
         text: "Camera",
@@ -210,11 +265,45 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
     }
 
 
+  const isLimitReached = totalItems >= MAX_WARDROBE_ITEMS;
+
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.overlay}>
         <BlurView intensity={40} tint="dark" style={styles.sheet}>
           <Text style={styles.title}>Add to Wardrobe</Text>
+
+          {/* Wardrobe Count & Limit Warning */}
+          {loadingCount ? (
+            <View style={styles.countContainer}>
+              <ActivityIndicator size="small" color={COLORS.textSecondary} />
+              <Text style={styles.countText}>Loading...</Text>
+            </View>
+          ) : (
+            <View style={[
+              styles.countContainer,
+              isLimitReached && styles.limitReachedContainer
+            ]}>
+              {isLimitReached && (
+                <Ionicons name="warning" size={16} color="#ff6b6b" />
+              )}
+              <Text style={[
+                styles.countText,
+                isLimitReached && styles.limitReachedText
+              ]}>
+                {totalItems}/{MAX_WARDROBE_ITEMS} items
+              </Text>
+            </View>
+          )}
+
+          {/* Limit Reached Warning */}
+          {isLimitReached && (
+            <View style={styles.warningBox}>
+              <Text style={styles.warningText}>
+                Wardrobe full! Delete some items to upload new ones.
+              </Text>
+            </View>
+          )}
 
           {/* Category */}
           <CategorySelector value={category} onChange={setCategory} />
@@ -289,7 +378,46 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: COLORS.textPrimary,
+    marginBottom: 12,
+  },
+  countContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    marginBottom: 12,
+    alignSelf: "center",
+  },
+  limitReachedContainer: {
+    backgroundColor: "rgba(255,107,107,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(255,107,107,0.3)",
+  },
+  countText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+  limitReachedText: {
+    color: "#ff6b6b",
+  },
+  warningBox: {
+    backgroundColor: "rgba(255,107,107,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255,107,107,0.25)",
+    borderRadius: 12,
+    padding: 12,
     marginBottom: 16,
+  },
+  warningText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#ff6b6b",
+    textAlign: "center",
   },
   row: {
     flexDirection: "row",

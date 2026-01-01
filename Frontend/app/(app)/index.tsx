@@ -15,11 +15,18 @@ type GeneratedImage = {
   generation_time_ms: number;
 };
 
+type UserCredits = {
+  available_tryons: number;
+};
+
 export default function HomeScreen() {
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [wardrobeCount, setWardrobeCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [credits, setCredits] = useState<UserCredits>({
+    available_tryons: 0,
+  });
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -68,6 +75,18 @@ export default function HomeScreen() {
       if (wardrobeResponse.ok) {
         const wardrobeData = await wardrobeResponse.json();
         setWardrobeCount(wardrobeData.length || 0);
+      }
+
+      // Fetch user credits
+      const creditsResponse = await fetch(`${API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (creditsResponse.ok) {
+        const userData = await creditsResponse.json();
+        setCredits({
+          available_tryons: userData.user.available_tryons || 0,
+        });
       }
     } catch (error) {
       console.error("Error fetching home data:", error);
@@ -125,6 +144,32 @@ export default function HomeScreen() {
               source={{ uri: "https://i.pravatar.cc/100" }}
               style={styles.avatar}
             />
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Credits Badge */}
+        <Animated.View
+          style={[
+            styles.creditsBadgeContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.creditsBadge}
+            onPress={() => router.push("/pricing")}
+            activeOpacity={0.8}
+          >
+            <View style={styles.creditsIconContainer}>
+              <Ionicons name="diamond" size={24} color="#D4AF37" />
+            </View>
+            <View style={styles.creditsInfo}>
+              <Text style={styles.creditsLabel}>Available Try-Ons</Text>
+              <Text style={styles.creditsCount}>{credits.available_tryons}</Text>
+            </View>
+            <Ionicons name="add-circle" size={28} color="#D4AF37" />
           </TouchableOpacity>
         </Animated.View>
 
@@ -271,7 +316,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 24,
+    paddingBottom: 12,
+  },
+  creditsBadgeContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 20,
+  },
+  creditsBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "rgba(212, 175, 55, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(212, 175, 55, 0.3)",
+    gap: 12,
+  },
+  creditsIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(212, 175, 55, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  creditsInfo: {
+    flex: 1,
+  },
+  creditsLabel: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.6)",
+    marginBottom: 2,
+  },
+  creditsCount: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#D4AF37",
   },
   appName: {
     fontSize: 32,
