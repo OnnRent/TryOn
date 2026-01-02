@@ -306,21 +306,38 @@ app.post(
         console.log(`\n📸 Processing ${img.view} image...`);
         const imageId = uuidv4();
 
-        // Try background removal, fallback to original if it fails
+        // Step 1: Resize and optimize image before processing
+        console.log(`📐 Resizing ${img.view} image...`);
+        let optimizedBuffer;
+        try {
+          optimizedBuffer = await sharp(img.file.buffer)
+            .resize(1200, 1600, {
+              fit: 'inside',
+              withoutEnlargement: true, // Don't upscale small images
+            })
+            .jpeg({ quality: 90 })
+            .toBuffer();
+          console.log(`✅ ${img.view} resized: ${img.file.buffer.length} -> ${optimizedBuffer.length} bytes`);
+        } catch (resizeError) {
+          console.error(`⚠️ Resize failed for ${img.view}:`, resizeError.message);
+          optimizedBuffer = img.file.buffer;
+        }
+
+        // Step 2: Try background removal, fallback to optimized image if it fails
         let imageBuffer;
         try {
           if (process.env.REMOVEBGAPIKEY) {
             console.log(`🎨 Removing background for ${img.view}...`);
-            imageBuffer = await removeBackground(img.file.buffer);
+            imageBuffer = await removeBackground(optimizedBuffer);
             console.log(`✅ Background removed for ${img.view}`);
           } else {
             console.log("⚠️ No REMOVEBGAPIKEY found, skipping background removal");
-            imageBuffer = img.file.buffer;
+            imageBuffer = optimizedBuffer;
           }
         } catch (bgError) {
           console.error(`⚠️ Background removal failed for ${img.view}:`, bgError.message);
-          console.log("📸 Using original image instead");
-          imageBuffer = img.file.buffer;
+          console.log("📸 Using optimized image instead");
+          imageBuffer = optimizedBuffer;
         }
 
         const s3Key = `raw/${req.userId}/wardrobe/${wardrobe_item_id}/${img.view}.jpg`;
