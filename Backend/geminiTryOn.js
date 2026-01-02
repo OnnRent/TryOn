@@ -94,7 +94,7 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
     }
 
     const projectId = credentials.project_id || process.env.GCP_PROJECT_ID;
-    // Gemini 3 preview models require "global" location
+    // Gemini 3 Pro Image supports global endpoint
     const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
     console.log("GCP_PROJECT_ID:", projectId);
     console.log("GOOGLE_CLOUD_LOCATION:", location);
@@ -184,8 +184,15 @@ Generate a single high-quality photorealistic image.`;
       }
     };
 
+    // Gemini 3 Pro Image for virtual try-on
     const modelVersion = process.env.GEMINI_IMAGE_MODEL || "gemini-3-pro-image-preview";
-    const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelVersion}:generateContent`;
+
+    // For global endpoint, use aiplatform.googleapis.com (no location prefix)
+    // For regional endpoints, use {location}-aiplatform.googleapis.com
+    const hostname = location === "global"
+      ? "aiplatform.googleapis.com"
+      : `${location}-aiplatform.googleapis.com`;
+    const endpoint = `https://${hostname}/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelVersion}:generateContent`;
 
     console.log("🎨 Sending request to Gemini 3 Pro Image API...");
     console.log(`📍 Model: ${modelVersion}`);
