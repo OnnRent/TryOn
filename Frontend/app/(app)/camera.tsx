@@ -12,6 +12,24 @@ import ProcessingScreen from "../../src/components/ProcessingScreen";
 import ResultScreen from "../../src/components/ResultScreen";
 import { Image } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImageManipulator from "expo-image-manipulator";
+
+// Compress image to reduce file size before upload
+async function compressImage(uri: string): Promise<string> {
+  try {
+    console.log(`🗜️ Compressing image: ${uri.substring(0, 50)}...`);
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1200 } }], // Resize to max 1200px width
+      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    console.log(`✅ Compressed image: ${result.uri.substring(0, 50)}...`);
+    return result.uri;
+  } catch (error) {
+    console.error("⚠️ Image compression failed:", error);
+    return uri; // Return original if compression fails
+  }
+}
 
 
 
@@ -359,14 +377,18 @@ export default function CameraScreen() {
 
                 console.log(`🎨 Generating ${clothingType} try-on...`);
 
+                // Compress person image before upload
+                console.log("🗜️ Compressing person image...");
+                const compressedPhotoUri = await compressImage(photoUri);
+
                 // Prepare form data - send base64 data directly
                 console.log("📦 Preparing form data...");
                 const formData = new FormData();
 
-                // Person image - direct URI from camera
+                // Person image - compressed
                 // @ts-ignore - React Native FormData accepts file URIs
                 formData.append("person_image", {
-                  uri: photoUri,
+                  uri: compressedPhotoUri,
                   type: "image/jpeg",
                   name: "person.jpg",
                 } as any);
@@ -489,13 +511,17 @@ export default function CameraScreen() {
               throw new Error("No clothing image found");
             }
 
+            // Compress person image before upload
+            console.log("🗜️ Compressing person image...");
+            const compressedPhotoUri = await compressImage(photoUri);
+
             // Prepare form data with file URIs (React Native way)
             const formData = new FormData();
 
-            // Add person image - use file URI from camera
+            // Add person image - compressed
             // @ts-ignore - React Native FormData accepts file URIs
             formData.append("person_image", {
-              uri: photoUri,
+              uri: compressedPhotoUri,
               type: "image/jpeg",
               name: "person.jpg",
             } as any);
@@ -512,7 +538,7 @@ export default function CameraScreen() {
             formData.append("clothing_type", clothingType);
 
             console.log("📦 FormData prepared with URIs:", {
-              personUri: photoUri,
+              personUri: compressedPhotoUri,
               clothingUri: clothingImageUrl,
             });
 

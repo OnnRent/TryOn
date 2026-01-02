@@ -2,9 +2,9 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
+  View,
 } from "react-native";
-import { BlurView } from "expo-blur";
-import { useThemeColors, useIsDarkMode } from "../theme/colors";
+import { useThemeColors } from "../theme/colors";
 
 type Props = {
   uri: string;
@@ -13,7 +13,6 @@ type Props = {
 
 export default function GeneratedImageCard({ uri, onPress }: Props) {
   const colors = useThemeColors();
-  const isDark = useIsDarkMode();
 
   return (
     <TouchableOpacity
@@ -27,11 +26,9 @@ export default function GeneratedImageCard({ uri, onPress }: Props) {
         resizeMode="cover"
       />
 
-      {/* Subtle glass overlay */}
-      <BlurView
-        intensity={12}
-        tint={isDark ? "dark" : "light"}
-        style={[styles.glass, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+      {/* Subtle border overlay for depth */}
+      <View
+        style={[styles.borderOverlay, { borderColor: colors.glassBorder }]}
       />
     </TouchableOpacity>
   );
@@ -43,16 +40,16 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
   image: {
     width: "100%",
     height: "100%",
   },
-  glass: {
+  borderOverlay: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 18,
     borderWidth: 1,

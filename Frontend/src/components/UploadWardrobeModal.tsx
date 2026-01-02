@@ -1,10 +1,11 @@
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator } from "react-native";
 import { BlurView } from "expo-blur";
 import { useState, useEffect } from "react";
 import { useThemeColors, useIsDarkMode } from "../theme/colors";
 import CategorySelector from "./CategorySelector";
 import UploadImageCard from "./UploadImageCard";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import {
   requestCameraPermission,
   requestGalleryPermission,
@@ -12,6 +13,23 @@ import {
 import { Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+
+// Compress image to reduce file size before upload
+async function compressImage(uri: string): Promise<string> {
+  try {
+    console.log(`🗜️ Compressing image: ${uri.substring(0, 50)}...`);
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1200 } }], // Resize to max 1200px width
+      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    console.log(`✅ Compressed image: ${result.uri.substring(0, 50)}...`);
+    return result.uri;
+  } catch (error) {
+    console.error("⚠️ Image compression failed:", error);
+    return uri; // Return original if compression fails
+  }
+}
 
 type Props = {
   visible: boolean;
@@ -96,15 +114,15 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
       body: JSON.stringify({ category }),
     });
 
-    // Safely parse response - handle non-JSON responses
-    const responseText = await res.text();
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      console.error("❌ Failed to parse response:", responseText);
-      throw new Error(`Server error: ${responseText.substring(0, 100)}`);
-    }
+    const data = await res.json();
+
+
+
+
+
+
+
+
 
     if (!res.ok) {
       throw new Error(data.error || "Failed to create wardrobe item");
@@ -113,104 +131,103 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
     return data.wardrobe_item_id;
   }
 
-  // STEP 2: Upload images using XMLHttpRequest for better Android compatibility
-  async function uploadImages(wardrobeItemId: string): Promise<any> {
+  // STEP 2: Upload images
+  async function uploadImages(wardrobeItemId: string) {
     if (!frontImage || !backImage) {
       throw new Error("Both front and back images are required");
     }
 
     const token = await getAuthToken();
 
-    return new Promise((resolve, reject) => {
-      // Create FormData
-      const formData = new FormData();
+    // Compress images before upload to reduce file size
+    console.log("🗜️ Compressing images before upload...");
+    const compressedFront = await compressImage(frontImage);
+    const compressedBack = await compressImage(backImage);
 
-      // Get file info for front image - use original URI as-is
-      const frontFilename = frontImage.split('/').pop() || 'front.jpg';
+    // Create FormData - React Native specific format
+    const formData = new FormData();
 
-      // Get file info for back image
-      const backFilename = backImage.split('/').pop() || 'back.jpg';
+    // Append compressed images - always use JPEG after compression
+    formData.append('front', {
+      uri: compressedFront,
+      name: 'front.jpg',
+      type: 'image/jpeg',
+    } as any);
 
-      // Append images - React Native FormData format
-      formData.append('front', {
-        uri: frontImage,
-        name: frontFilename,
-        type: 'image/jpeg',
-      } as any);
+    formData.append('back', {
+      uri: compressedBack,
+      name: 'back.jpg',
+      type: 'image/jpeg',
+    } as any);
 
-      formData.append('back', {
-        uri: backImage,
-        name: backFilename,
-        type: 'image/jpeg',
-      } as any);
+    formData.append('wardrobe_item_id', wardrobeItemId);
 
-      formData.append('wardrobe_item_id', wardrobeItemId);
+    console.log("📤 Uploading images...");
+    console.log("Wardrobe Item ID:", wardrobeItemId);
+    console.log("Front (compressed):", compressedFront.substring(0, 50));
+    console.log("Back (compressed):", compressedBack.substring(0, 50));
 
-      console.log("📤 Uploading images with XMLHttpRequest...");
-      console.log("Platform:", Platform.OS);
-      console.log("Wardrobe Item ID:", wardrobeItemId);
-      console.log("Front URI:", frontImage);
-      console.log("Back URI:", backImage);
 
-      const xhr = new XMLHttpRequest();
-
-      xhr.onreadystatechange = () => {
-        console.log("📡 XHR readyState:", xhr.readyState, "status:", xhr.status);
-
-        if (xhr.readyState !== 4) return;
-
-        console.log("📥 XHR Final status:", xhr.status);
-        console.log("📥 XHR Response:", xhr.responseText?.substring(0, 500));
-
-        // Status 0 means network error (CORS, connection failed, etc.)
-        if (xhr.status === 0) {
-          console.error("❌ XHR status 0 - Network/CORS error");
-          reject(new Error("Network error: Could not connect to server. Please check your connection."));
-          return;
-        }
-
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            resolve(data);
-          } catch (e) {
-            console.error("❌ Failed to parse success response:", xhr.responseText);
-            // Still resolve since upload was successful
-            resolve({ message: "Upload completed" });
-          }
-        } else {
-          let errorMessage = `Upload failed (status ${xhr.status})`;
-          try {
-            const errorData = JSON.parse(xhr.responseText);
-            // Ensure error is a string
-            errorMessage = typeof errorData.error === 'string'
-              ? errorData.error
-              : JSON.stringify(errorData.error) || errorMessage;
-          } catch (e) {
-            const responsePreview = xhr.responseText?.substring(0, 100) || 'No response';
-            errorMessage = `${errorMessage}: ${responsePreview}`;
-          }
-          console.error("❌ Upload failed:", errorMessage);
-          reject(new Error(errorMessage));
-        }
-      };
-
-      xhr.onerror = () => {
-        console.error("❌ XHR Network error");
-        reject(new Error("Network error during upload. Please check your connection."));
-      };
-
-      xhr.ontimeout = () => {
-        console.error("❌ XHR Timeout");
-        reject(new Error("Upload timed out. Please try again."));
-      };
-
-      xhr.open('POST', 'https://api.tryonapp.in/wardrobe/image');
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      xhr.setRequestHeader('Accept', 'application/json');
-      xhr.timeout = 120000; // 2 minute timeout
-      xhr.send(formData);
+    const res = await fetch("https://api.tryonapp.in/wardrobe/image", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // Don't set Content-Type - let fetch set it automatically with boundary
+      },
+      body: formData,
     });
+
+    console.log("📥 Response status:", res.status);
+
+    // Safely parse response - handle non-JSON responses (common on Android timeouts)
+    const responseText = await res.text();
+    console.log("📥 Response text:", responseText?.substring(0, 200));
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("❌ Failed to parse response as JSON:", responseText?.substring(0, 100));
+      throw new Error(`Server error: ${responseText?.substring(0, 100) || 'Unknown error'}`);
+    }
+
+    console.log("📥 Response data:", data);
+
+    if (!res.ok) {
+      console.error("❌ Upload failed:", data);
+      throw new Error(data.error || "Failed to upload images");
+    }
+
+
+
+
+
+
+
+
+    return data;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   }
 
   // Main upload handler
@@ -273,13 +290,13 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
       return;
     }
 
-    // Image picker options - compress more on Android to avoid 503 errors
-    const imageOptions: ImagePicker.ImagePickerOptions = {
-      quality: Platform.OS === 'android' ? 0.5 : 0.8, // Lower quality on Android
-      allowsEditing: true,
-      aspect: [3, 4] as [number, number], // Consistent aspect ratio
-      exif: false, // Don't include EXIF data to reduce size
-    };
+
+
+
+
+
+
+
 
     Alert.alert("Select Image", "Choose image source", [
         {
@@ -288,12 +305,17 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
             const granted = await requestCameraPermission();
             if (!granted) return;
 
-            const result = await ImagePicker.launchCameraAsync(imageOptions);
+            const result = await ImagePicker.launchCameraAsync({
+              quality: 0.7,
+              allowsEditing: true,
+              aspect: [3, 4],
+              exif: false, // Don't include EXIF data to reduce size
+            });
 
             if (!result.canceled) {
-            const uri = result.assets[0].uri;
-            console.log(`📸 Camera image size: ${result.assets[0].fileSize || 'unknown'} bytes`);
-            type === "front" ? setFrontImage(uri) : setBackImage(uri);
+              const uri = result.assets[0].uri;
+              console.log("📸 Camera image size:", result.assets[0].fileSize ? `${(result.assets[0].fileSize / 1024 / 1024).toFixed(2)} MB` : "unknown");
+              type === "front" ? setFrontImage(uri) : setBackImage(uri);
             }
         },
         },
@@ -303,12 +325,17 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
             const granted = await requestGalleryPermission();
             if (!granted) return;
 
-            const result = await ImagePicker.launchImageLibraryAsync(imageOptions);
+            const result = await ImagePicker.launchImageLibraryAsync({
+              quality: 0.7,
+              allowsEditing: true,
+              aspect: [3, 4],
+              exif: false, // Don't include EXIF data to reduce size
+            });
 
             if (!result.canceled) {
-            const uri = result.assets[0].uri;
-            console.log(`🖼️ Gallery image size: ${result.assets[0].fileSize || 'unknown'} bytes`);
-            type === "front" ? setFrontImage(uri) : setBackImage(uri);
+              const uri = result.assets[0].uri;
+              console.log("🖼️ Gallery image size:", result.assets[0].fileSize ? `${(result.assets[0].fileSize / 1024 / 1024).toFixed(2)} MB` : "unknown");
+              type === "front" ? setFrontImage(uri) : setBackImage(uri);
             }
         },
         },
