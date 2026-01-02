@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator } from "react-native";
 import { BlurView } from "expo-blur";
 import { useState, useEffect } from "react";
-import { COLORS } from "../theme/colors";
+import { useThemeColors, useIsDarkMode } from "../theme/colors";
 import CategorySelector from "./CategorySelector";
 import UploadImageCard from "./UploadImageCard";
 import * as ImagePicker from "expo-image-picker";
@@ -21,6 +21,8 @@ type Props = {
 const MAX_WARDROBE_ITEMS = 15;
 
 export default function UploadWardrobeModal({ visible, onClose }: Props) {
+  const colors = useThemeColors();
+  const isDark = useIsDarkMode();
   const [category, setCategory] = useState<"top" | "bottom">("top");
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [backImage, setBackImage] = useState<string | null>(null);
@@ -270,18 +272,19 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.overlay}>
-        <BlurView intensity={40} tint="dark" style={styles.sheet}>
-          <Text style={styles.title}>Add to Wardrobe</Text>
+        <BlurView intensity={40} tint={isDark ? "dark" : "light"} style={[styles.sheet, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
+          <Text style={[styles.title, { color: colors.textPrimary }]}>Add to Wardrobe</Text>
 
           {/* Wardrobe Count & Limit Warning */}
           {loadingCount ? (
-            <View style={styles.countContainer}>
-              <ActivityIndicator size="small" color={COLORS.textSecondary} />
-              <Text style={styles.countText}>Loading...</Text>
+            <View style={[styles.countContainer, { backgroundColor: colors.glass }]}>
+              <ActivityIndicator size="small" color={colors.textSecondary} />
+              <Text style={[styles.countText, { color: colors.textSecondary }]}>Loading...</Text>
             </View>
           ) : (
             <View style={[
               styles.countContainer,
+              { backgroundColor: colors.glass },
               isLimitReached && styles.limitReachedContainer
             ]}>
               {isLimitReached && (
@@ -289,6 +292,7 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
               )}
               <Text style={[
                 styles.countText,
+                { color: colors.textSecondary },
                 isLimitReached && styles.limitReachedText
               ]}>
                 {totalItems}/{MAX_WARDROBE_ITEMS} items
@@ -325,8 +329,8 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
           {/* Upload Status */}
           {uploading && uploadStatus && (
             <View style={styles.statusContainer}>
-              <ActivityIndicator size="small" color={COLORS.textPrimary} />
-              <Text style={styles.statusText}>{uploadStatus}</Text>
+              <ActivityIndicator size="small" color={colors.textPrimary} />
+              <Text style={[styles.statusText, { color: colors.textSecondary }]}>{uploadStatus}</Text>
             </View>
           )}
 
@@ -336,19 +340,20 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
             onPress={handleUpload}
             style={[
               styles.uploadBtn,
+              { backgroundColor: isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.08)" },
               !canUpload && { opacity: 0.4 },
             ]}
           >
             {uploading ? (
-              <ActivityIndicator size="small" color={COLORS.textPrimary} />
+              <ActivityIndicator size="small" color={colors.textPrimary} />
             ) : (
-              <Text style={styles.uploadText}>Upload</Text>
+              <Text style={[styles.uploadText, { color: colors.textPrimary }]}>Upload</Text>
             )}
           </TouchableOpacity>
 
           {/* Cancel */}
           <TouchableOpacity onPress={onClose} disabled={uploading}>
-            <Text style={[styles.cancel, uploading && { opacity: 0.4 }]}>
+            <Text style={[styles.cancel, { color: colors.textSecondary }, uploading && { opacity: 0.4 }]}>
               Cancel
             </Text>
           </TouchableOpacity>
@@ -371,13 +376,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.04)",
   },
   title: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.textPrimary,
     marginBottom: 12,
   },
   countContainer: {
@@ -388,7 +390,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.06)",
     marginBottom: 12,
     alignSelf: "center",
   },
@@ -400,7 +401,6 @@ const styles = StyleSheet.create({
   countText: {
     fontSize: 13,
     fontWeight: "600",
-    color: COLORS.textSecondary,
   },
   limitReachedText: {
     color: "#ff6b6b",
@@ -434,24 +434,20 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 14,
-    color: COLORS.textSecondary,
   },
   uploadBtn: {
     height: 48,
     borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.14)",
     alignItems: "center",
     justifyContent: "center",
   },
   uploadText: {
     fontSize: 15,
     fontWeight: "700",
-    color: COLORS.textPrimary,
   },
   cancel: {
     marginTop: 14,
     textAlign: "center",
-    color: COLORS.textSecondary,
     fontSize: 14,
   },
 });

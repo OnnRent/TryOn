@@ -6,7 +6,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
-import { COLORS } from "../theme/colors";
+import { useThemeColors } from "../theme/colors";
 import { useState } from "react";
 
 const { width, height } = Dimensions.get("window");
@@ -16,12 +16,13 @@ type Props = {
 };
 
 export default function ResultScreen({ images }: Props) {
+  const colors = useThemeColors();
   const [loadingStates, setLoadingStates] = useState<{ [key: number]: boolean }>(
     images.reduce((acc, _, i) => ({ ...acc, [i]: true }), {})
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={images}
         horizontal
@@ -33,7 +34,7 @@ export default function ResultScreen({ images }: Props) {
             {loadingStates[index] && (
               <ActivityIndicator
                 size="large"
-                color={COLORS.textPrimary}
+                color={colors.textPrimary}
                 style={styles.loader}
               />
             )}
@@ -65,7 +66,6 @@ export default function ResultScreen({ images }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
 
   page: {
@@ -79,7 +79,6 @@ const styles = StyleSheet.create({
     width: width - 32,
     height: height * 0.75,
     borderRadius: 24,
-    // Prevent blurriness on high-DPI screens
     backgroundColor: 'transparent',
   },
 

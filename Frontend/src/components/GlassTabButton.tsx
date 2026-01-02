@@ -1,6 +1,6 @@
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "../theme/colors";
+import { useThemeColors, useIsDarkMode } from "../theme/colors";
 
 type Props = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -9,6 +9,9 @@ type Props = {
 };
 
 export default function GlassTabButton({ icon, active, onPress }: Props) {
+  const colors = useThemeColors();
+  const isDark = useIsDarkMode();
+
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -16,11 +19,17 @@ export default function GlassTabButton({ icon, active, onPress }: Props) {
       style={styles.wrapper}
     >
       {active ? (
-        <View style={styles.activeBubble}>
-          <Ionicons name={icon} size={22} color={COLORS.textPrimary} />
+        <View style={[
+          styles.activeBubble,
+          {
+            backgroundColor: isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.08)",
+            borderColor: isDark ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.12)",
+          }
+        ]}>
+          <Ionicons name={icon} size={22} color={colors.textPrimary} />
         </View>
       ) : (
-        <Ionicons name={icon} size={22} color={COLORS.textSecondary} />
+        <Ionicons name={icon} size={22} color={colors.textSecondary} />
       )}
     </TouchableOpacity>
   );
@@ -40,13 +49,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-
-    // Glassy frosted look
-    backgroundColor: "rgba(255,255,255,0.14)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
-
-    // Subtle depth (iOS style)
     shadowColor: "#000",
     shadowOpacity: 0.25,
     shadowRadius: 6,

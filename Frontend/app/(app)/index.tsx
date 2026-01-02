@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useThemeColors, useIsDarkMode } from "../../src/theme/colors";
 
 const API_URL = "https://api.tryonapp.in";
 
@@ -20,6 +21,9 @@ type UserCredits = {
 };
 
 export default function HomeScreen() {
+  const colors = useThemeColors();
+  const isDark = useIsDarkMode();
+
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [wardrobeCount, setWardrobeCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -103,17 +107,17 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <ActivityIndicator size="large" color={colors.textPrimary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -121,7 +125,7 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#FFFFFF"
+            tintColor={colors.textPrimary}
           />
         }
       >
@@ -135,9 +139,9 @@ export default function HomeScreen() {
             }
           ]}
         >
-          <Text style={styles.appName}>TryOn</Text>
+          <Text style={[styles.appName, { color: colors.textPrimary }]}>TryOn</Text>
           <TouchableOpacity
-            style={styles.profileButton}
+            style={[styles.profileButton, { borderColor: colors.cardBorder }]}
             onPress={() => router.push("/profile")}
           >
             <Image
@@ -158,18 +162,18 @@ export default function HomeScreen() {
           ]}
         >
           <TouchableOpacity
-            style={styles.creditsBadge}
+            style={[styles.creditsBadge, { backgroundColor: colors.accentBackground, borderColor: colors.accentBorder }]}
             onPress={() => router.push("/pricing")}
             activeOpacity={0.8}
           >
-            <View style={styles.creditsIconContainer}>
-              <Ionicons name="diamond" size={24} color="#D4AF37" />
+            <View style={[styles.creditsIconContainer, { backgroundColor: colors.accentBackground }]}>
+              <Ionicons name="diamond" size={24} color={colors.accent} />
             </View>
             <View style={styles.creditsInfo}>
-              <Text style={styles.creditsLabel}>Available Try-Ons</Text>
-              <Text style={styles.creditsCount}>{credits.available_tryons}</Text>
+              <Text style={[styles.creditsLabel, { color: colors.textSecondary }]}>Available Try-Ons</Text>
+              <Text style={[styles.creditsCount, { color: colors.accent }]}>{credits.available_tryons}</Text>
             </View>
-            <Ionicons name="add-circle" size={28} color="#D4AF37" />
+            <Ionicons name="add-circle" size={28} color={colors.accent} />
           </TouchableOpacity>
         </Animated.View>
 
@@ -185,44 +189,44 @@ export default function HomeScreen() {
         >
           {/* Large Card - Try On */}
           <TouchableOpacity
-            style={[styles.bentoCard, styles.bentoLarge]}
+            style={[styles.bentoCard, styles.bentoLarge, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
             onPress={() => router.push("/camera")}
             activeOpacity={0.8}
           >
             <View style={styles.cardContent}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="camera" size={32} color="#FFFFFF" />
+              <View style={[styles.iconContainer, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+                <Ionicons name="camera" size={32} color={colors.textPrimary} />
               </View>
-              <Text style={styles.cardTitle}>Virtual Try-On</Text>
-              <Text style={styles.cardSubtitle}>See yourself in new outfits</Text>
+              <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Virtual Try-On</Text>
+              <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>See yourself in new outfits</Text>
             </View>
-            <View style={styles.cardGlow} />
+            <View style={[styles.cardGlow, { backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)" }]} />
           </TouchableOpacity>
 
           {/* Small Cards Row */}
           <View style={styles.bentoRow}>
             <TouchableOpacity
-              style={[styles.bentoCard, styles.bentoSmall]}
+              style={[styles.bentoCard, styles.bentoSmall, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
               onPress={() => router.push("/wardrobe")}
               activeOpacity={0.8}
             >
-              <View style={styles.iconContainer}>
-                <Ionicons name="shirt" size={24} color="#FFFFFF" />
+              <View style={[styles.iconContainer, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+                <Ionicons name="shirt" size={24} color={colors.textPrimary} />
               </View>
-              <Text style={styles.cardTitleSmall}>Wardrobe</Text>
-              <Text style={styles.statNumber}>{wardrobeCount}</Text>
+              <Text style={[styles.cardTitleSmall, { color: colors.textPrimary }]}>Wardrobe</Text>
+              <Text style={[styles.statNumber, { color: colors.textPrimary }]}>{wardrobeCount}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.bentoCard, styles.bentoSmall]}
+              style={[styles.bentoCard, styles.bentoSmall, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
               onPress={() => router.push("/images")}
               activeOpacity={0.8}
             >
-              <View style={styles.iconContainer}>
-                <Ionicons name="images" size={24} color="#FFFFFF" />
+              <View style={[styles.iconContainer, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+                <Ionicons name="images" size={24} color={colors.textPrimary} />
               </View>
-              <Text style={styles.cardTitleSmall}>Gallery</Text>
-              <Text style={styles.statNumber}>{generatedImages.length}</Text>
+              <Text style={[styles.cardTitleSmall, { color: colors.textPrimary }]}>Gallery</Text>
+              <Text style={[styles.statNumber, { color: colors.textPrimary }]}>{generatedImages.length}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -238,9 +242,9 @@ export default function HomeScreen() {
             ]}
           >
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Generations</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Recent Generations</Text>
               <TouchableOpacity onPress={() => router.push("/images")}>
-                <Text style={styles.seeAll}>See All</Text>
+                <Text style={[styles.seeAll, { color: colors.textSecondary }]}>See All</Text>
               </TouchableOpacity>
             </View>
 
@@ -252,7 +256,7 @@ export default function HomeScreen() {
               {generatedImages.map((image) => (
                 <TouchableOpacity
                   key={image.id}
-                  style={styles.recentCard}
+                  style={[styles.recentCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
                   activeOpacity={0.8}
                   onPress={() => router.push("/images")}
                 >
@@ -280,9 +284,9 @@ export default function HomeScreen() {
               }
             ]}
           >
-            <Ionicons name="images-outline" size={64} color="#333333" />
-            <Text style={styles.emptyTitle}>No Generations Yet</Text>
-            <Text style={styles.emptySubtitle}>
+            <Ionicons name="images-outline" size={64} color={colors.cardBorder} />
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Generations Yet</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
               Start creating virtual try-ons to see them here
             </Text>
           </Animated.View>
@@ -295,7 +299,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
   },
   loadingContainer: {
     flex: 1,
@@ -305,7 +308,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: "#888888",
   },
   scrollContent: {
     paddingBottom: 140,
@@ -327,16 +329,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
     borderRadius: 16,
-    backgroundColor: "rgba(212, 175, 55, 0.1)",
     borderWidth: 1,
-    borderColor: "rgba(212, 175, 55, 0.3)",
     gap: 12,
   },
   creditsIconContainer: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(212, 175, 55, 0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -345,24 +344,20 @@ const styles = StyleSheet.create({
   },
   creditsLabel: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.6)",
     marginBottom: 2,
   },
   creditsCount: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#D4AF37",
   },
   appName: {
     fontSize: 32,
     fontWeight: "900",
-    color: "#FFFFFF",
     letterSpacing: -1,
   },
   profileButton: {
     borderRadius: 50,
     borderWidth: 2,
-    borderColor: "#333333",
   },
   avatar: {
     width: 48,
@@ -374,10 +369,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   bentoCard: {
-    backgroundColor: "#1a1a1a",
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: "#333333",
     overflow: "hidden",
     position: "relative",
   },
@@ -403,33 +396,27 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
   },
   cardTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#FFFFFF",
     marginBottom: 6,
   },
   cardSubtitle: {
     fontSize: 14,
-    color: "#888888",
   },
   cardTitleSmall: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#FFFFFF",
     marginBottom: 8,
   },
   statNumber: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#FFFFFF",
   },
   cardGlow: {
     position: "absolute",
@@ -438,7 +425,6 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: "rgba(255,255,255,0.03)",
   },
   recentSection: {
     marginTop: 32,
@@ -446,7 +432,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#FFFFFF",
     marginBottom: 16,
   },
   sectionHeader: {
@@ -458,7 +443,6 @@ const styles = StyleSheet.create({
   },
   seeAll: {
     fontSize: 14,
-    color: "#888888",
     fontWeight: "600",
   },
   recentScroll: {
@@ -470,9 +454,7 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 20,
     overflow: "hidden",
-    backgroundColor: "#1a1a1a",
     borderWidth: 1,
-    borderColor: "#333333",
     position: "relative",
   },
   recentImage: {
@@ -494,12 +476,10 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#FFFFFF",
     marginTop: 16,
   },
   emptySubtitle: {
     fontSize: 15,
-    color: "#888888",
     textAlign: "center",
     lineHeight: 22,
   },
@@ -507,14 +487,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 32,
     paddingVertical: 14,
-    backgroundColor: "#1a1a1a",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#333333",
   },
   emptyButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#FFFFFF",
   },
 });

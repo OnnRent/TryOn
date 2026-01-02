@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { COLORS } from "../theme/colors";
+import { useThemeColors } from "../theme/colors";
 import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
@@ -8,10 +8,12 @@ type Props = {
 };
 
 export default function HomeSectionHeader({ title, onPress }: Props) {
+  const colors = useThemeColors();
+
   return (
     <TouchableOpacity onPress={onPress} style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
-      <Ionicons name="chevron-forward" size={18} color={COLORS.textSecondary} />
+      <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
+      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
     </TouchableOpacity>
   );
 }
@@ -28,6 +30,5 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: "600",
-    color: COLORS.textPrimary,
   },
 });

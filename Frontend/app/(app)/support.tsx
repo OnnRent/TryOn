@@ -9,11 +9,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "../../src/theme/colors";
+import { useThemeColors, useIsDarkMode } from "../../src/theme/colors";
 import { router } from "expo-router";
 import { BlurView } from "expo-blur";
 
 export default function SupportScreen() {
+  const colors = useThemeColors();
+  const isDark = useIsDarkMode();
+
   const handleEmailSupport = () => {
     Linking.openURL("mailto:support@tryon.app?subject=TryOn Support Request");
   };
@@ -31,13 +34,13 @@ export default function SupportScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Help & Support</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Help & Support</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -47,43 +50,43 @@ export default function SupportScreen() {
       >
         {/* Contact Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact Us</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Contact Us</Text>
 
           <TouchableOpacity onPress={handleEmailSupport} activeOpacity={0.7}>
-            <BlurView intensity={20} tint="dark" style={styles.card}>
+            <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
               <View style={styles.cardItem}>
                 <Ionicons name="mail-outline" size={24} color="#3b82f6" />
                 <View style={styles.cardContent}>
-                  <Text style={styles.cardLabel}>Email Support</Text>
-                  <Text style={styles.cardDescription}>support@tryon.app</Text>
+                  <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>Email Support</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>support@tryon.app</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </View>
             </BlurView>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleReportBug} activeOpacity={0.7}>
-            <BlurView intensity={20} tint="dark" style={styles.card}>
+            <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
               <View style={styles.cardItem}>
                 <Ionicons name="bug-outline" size={24} color="#ef4444" />
                 <View style={styles.cardContent}>
-                  <Text style={styles.cardLabel}>Report a Bug</Text>
-                  <Text style={styles.cardDescription}>Help us improve</Text>
+                  <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>Report a Bug</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>Help us improve</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </View>
             </BlurView>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleFeatureRequest} activeOpacity={0.7}>
-            <BlurView intensity={20} tint="dark" style={styles.card}>
+            <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
               <View style={styles.cardItem}>
                 <Ionicons name="bulb-outline" size={24} color="#f59e0b" />
                 <View style={styles.cardContent}>
-                  <Text style={styles.cardLabel}>Feature Request</Text>
-                  <Text style={styles.cardDescription}>Share your ideas</Text>
+                  <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>Feature Request</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>Share your ideas</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </View>
             </BlurView>
           </TouchableOpacity>
@@ -91,7 +94,7 @@ export default function SupportScreen() {
 
         {/* FAQ Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Frequently Asked Questions</Text>
 
           <TouchableOpacity
             onPress={() =>
@@ -102,11 +105,11 @@ export default function SupportScreen() {
             }
             activeOpacity={0.7}
           >
-            <BlurView intensity={20} tint="dark" style={styles.card}>
+            <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
               <View style={styles.cardItem}>
-                <Ionicons name="help-circle-outline" size={20} color={COLORS.textSecondary} />
-                <Text style={styles.faqQuestion}>How do I add clothes to my wardrobe?</Text>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                <Ionicons name="help-circle-outline" size={20} color={colors.textSecondary} />
+                <Text style={[styles.faqQuestion, { color: colors.textPrimary }]}>How do I add clothes to my wardrobe?</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </View>
             </BlurView>
           </TouchableOpacity>
@@ -120,11 +123,11 @@ export default function SupportScreen() {
             }
             activeOpacity={0.7}
           >
-            <BlurView intensity={20} tint="dark" style={styles.card}>
+            <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
               <View style={styles.cardItem}>
-                <Ionicons name="help-circle-outline" size={20} color={COLORS.textSecondary} />
-                <Text style={styles.faqQuestion}>How does virtual try-on work?</Text>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                <Ionicons name="help-circle-outline" size={20} color={colors.textSecondary} />
+                <Text style={[styles.faqQuestion, { color: colors.textPrimary }]}>How does virtual try-on work?</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </View>
             </BlurView>
           </TouchableOpacity>
@@ -138,11 +141,11 @@ export default function SupportScreen() {
             }
             activeOpacity={0.7}
           >
-            <BlurView intensity={20} tint="dark" style={styles.card}>
+            <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
               <View style={styles.cardItem}>
-                <Ionicons name="help-circle-outline" size={20} color={COLORS.textSecondary} />
-                <Text style={styles.faqQuestion}>Can I delete items from my wardrobe?</Text>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                <Ionicons name="help-circle-outline" size={20} color={colors.textSecondary} />
+                <Text style={[styles.faqQuestion, { color: colors.textPrimary }]}>Can I delete items from my wardrobe?</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </View>
             </BlurView>
           </TouchableOpacity>
@@ -156,11 +159,11 @@ export default function SupportScreen() {
             }
             activeOpacity={0.7}
           >
-            <BlurView intensity={20} tint="dark" style={styles.card}>
+            <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
               <View style={styles.cardItem}>
-                <Ionicons name="help-circle-outline" size={20} color={COLORS.textSecondary} />
-                <Text style={styles.faqQuestion}>Is my data secure?</Text>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                <Ionicons name="help-circle-outline" size={20} color={colors.textSecondary} />
+                <Text style={[styles.faqQuestion, { color: colors.textPrimary }]}>Is my data secure?</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </View>
             </BlurView>
           </TouchableOpacity>
@@ -168,13 +171,13 @@ export default function SupportScreen() {
 
         {/* App Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App Information</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>App Information</Text>
 
-          <BlurView intensity={20} tint="dark" style={styles.card}>
+          <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
             <View style={styles.cardItem}>
-              <Ionicons name="information-circle-outline" size={20} color={COLORS.textSecondary} />
-              <Text style={styles.cardLabel}>Version</Text>
-              <Text style={styles.cardValue}>1.0.0</Text>
+              <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
+              <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>Version</Text>
+              <Text style={[styles.cardValue, { color: colors.textSecondary }]}>1.0.0</Text>
             </View>
           </BlurView>
         </View>
@@ -186,7 +189,6 @@ export default function SupportScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
   header: {
     flexDirection: "row",
@@ -204,7 +206,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: COLORS.textPrimary,
   },
   scrollContent: {
     padding: 16,
@@ -216,7 +217,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: COLORS.textPrimary,
     marginBottom: 12,
     paddingLeft: 4,
   },
@@ -225,8 +225,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.04)",
   },
   cardItem: {
     flexDirection: "row",
@@ -239,22 +237,18 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     fontSize: 15,
-    color: COLORS.textPrimary,
     fontWeight: "500",
     marginBottom: 2,
   },
   cardDescription: {
     fontSize: 13,
-    color: COLORS.textSecondary,
   },
   cardValue: {
     fontSize: 14,
-    color: COLORS.textSecondary,
   },
   faqQuestion: {
     flex: 1,
     fontSize: 14,
-    color: COLORS.textPrimary,
     fontWeight: "500",
   },
 });

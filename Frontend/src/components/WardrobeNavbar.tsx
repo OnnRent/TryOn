@@ -1,15 +1,18 @@
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Text, TouchableOpacity, StyleSheet } from "react-native";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "../theme/colors";
+import { useThemeColors, useIsDarkMode } from "../theme/colors";
 
 export default function WardrobeNavbar({ onAdd }: { onAdd: () => void }) {
+  const colors = useThemeColors();
+  const isDark = useIsDarkMode();
+
   return (
-    <BlurView intensity={20} tint="dark" style={styles.container}>
-      <Text style={styles.title}>Wardrobe</Text>
+    <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.container, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
+      <Text style={[styles.title, { color: colors.textPrimary }]}>Wardrobe</Text>
 
       <TouchableOpacity onPress={onAdd}>
-        <Ionicons name="add" size={26} color={COLORS.textPrimary} />
+        <Ionicons name="add" size={26} color={colors.textPrimary} />
       </TouchableOpacity>
     </BlurView>
   );
@@ -27,12 +30,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.04)",
   },
   title: {
     fontSize: 20,
     fontWeight: "700",
-    color: COLORS.textPrimary,
   },
 });

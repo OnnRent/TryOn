@@ -2,13 +2,14 @@
 import { Slot, usePathname, router } from "expo-router";
 import { View } from "react-native";
 import GlassTabBar from "../../src/components/GlassTabBar";
-import { COLORS } from "../../src/theme/colors";
+import { useThemeColors } from "../../src/theme/colors";
 
 export default function AppLayout() {
   const pathname = usePathname();
+  const colors = useThemeColors();
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Slot />
       {pathname !== "/camera" && (
         <GlassTabBar

@@ -1,10 +1,12 @@
 import { View, Text, StyleSheet } from "react-native";
 import LottieView from "lottie-react-native";
-import { COLORS } from "../theme/colors";
+import { useThemeColors } from "../theme/colors";
 
 export default function ProcessingScreen() {
+  const colors = useThemeColors();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Big AI Animation */}
       <LottieView
         source={require("../../assets/lottie/ai-processing.json")}
@@ -15,17 +17,17 @@ export default function ProcessingScreen() {
       />
 
       {/* Primary Message */}
-      <Text style={styles.title}>
+      <Text style={[styles.title, { color: colors.textPrimary }]}>
         Crafting your perfect look
       </Text>
 
       {/* Secondary Message */}
-      <Text style={styles.subtitle}>
+      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
         Our AI is analyzing fit, fabric, and style
       </Text>
 
       {/* Tertiary / reassurance */}
-      <Text style={styles.hint}>
+      <Text style={[styles.hint, { color: colors.textSecondary }]}>
         This usually takes just a few seconds
       </Text>
     </View>
@@ -35,14 +37,13 @@ export default function ProcessingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,
   },
 
   lottie: {
-    width: 320,   // 🔥 MUCH BIGGER
+    width: 320,
     height: 320,
     marginBottom: 32,
   },
@@ -50,7 +51,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "700",
-    color: COLORS.textPrimary,
     textAlign: "center",
     letterSpacing: 0.3,
   },
@@ -58,7 +58,6 @@ const styles = StyleSheet.create({
   subtitle: {
     marginTop: 10,
     fontSize: 15,
-    color: COLORS.textSecondary,
     textAlign: "center",
     lineHeight: 22,
   },
@@ -66,7 +65,6 @@ const styles = StyleSheet.create({
   hint: {
     marginTop: 18,
     fontSize: 13,
-    color: COLORS.textSecondary,
     opacity: 0.7,
     textAlign: "center",
   },

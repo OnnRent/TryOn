@@ -1,7 +1,7 @@
-import { View, FlatList, ActivityIndicator, Text, RefreshControl } from "react-native";
+import { View, FlatList, ActivityIndicator, Text, RefreshControl, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useEffect } from "react";
-import { COLORS } from "../../src/theme/colors";
+import { useThemeColors } from "../../src/theme/colors";
 import ImagesNavbar from "../../src/components/ImagesNavbar";
 import GeneratedImageCard from "../../src/components/GeneratedImageCard";
 import ImagePreviewModal from "../../src/components/ImagePreviewModal";
@@ -17,6 +17,7 @@ type GeneratedImage = {
 };
 
 export default function ImagesScreen() {
+  const colors = useThemeColors();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
@@ -75,11 +76,11 @@ export default function ImagesScreen() {
   // Show loading state
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <ImagesNavbar />
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={COLORS.textPrimary} />
-          <Text style={styles.loadingText}>Loading your try-ons...</Text>
+          <ActivityIndicator size="large" color={colors.textPrimary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading your try-ons...</Text>
         </View>
       </SafeAreaView>
     );
@@ -88,11 +89,11 @@ export default function ImagesScreen() {
   // Show empty state
   if (generatedImages.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <ImagesNavbar />
         <View style={styles.centerContainer}>
-          <Text style={styles.emptyTitle}>No Try-Ons Yet</Text>
-          <Text style={styles.emptySubtitle}>
+          <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Try-Ons Yet</Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
             Start creating virtual try-ons to see them here!
           </Text>
         </View>
@@ -101,7 +102,7 @@ export default function ImagesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ImagesNavbar />
 
       <FlatList
@@ -115,7 +116,7 @@ export default function ImagesScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={COLORS.textPrimary}
+            tintColor={colors.textPrimary}
           />
         }
         renderItem={({ item }) => (
@@ -141,51 +142,40 @@ export default function ImagesScreen() {
   );
 }
 
-const styles = {
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
-
   centerContainer: {
     flex: 1,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 40,
   },
-
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: COLORS.textSecondary,
   },
-
   emptyTitle: {
     fontSize: 22,
-    fontWeight: "700" as const,
-    color: COLORS.textPrimary,
+    fontWeight: "700",
     marginBottom: 8,
-    textAlign: "center" as const,
+    textAlign: "center",
   },
-
   emptySubtitle: {
     fontSize: 15,
-    color: COLORS.textSecondary,
-    textAlign: "center" as const,
+    textAlign: "center",
     lineHeight: 22,
   },
-
   row: {
     gap: 14,
     paddingHorizontal: 20,
   },
-
   column: {
     flex: 1,
   },
-
   listContent: {
     gap: 14,
-    paddingBottom: 140, // space for bottom nav
+    paddingBottom: 140,
   },
-};
+});

@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { COLORS } from "../theme/colors";
+import { useThemeColors, useIsDarkMode } from "../theme/colors";
 
 type Props = {
   value: "top" | "bottom";
@@ -7,20 +7,28 @@ type Props = {
 };
 
 export default function CategorySelector({ value, onChange }: Props) {
+  const colors = useThemeColors();
+  const isDark = useIsDarkMode();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
       {["top", "bottom"].map((item) => {
         const active = value === item;
         return (
           <TouchableOpacity
             key={item}
             onPress={() => onChange(item as any)}
-            style={[styles.tab, active && styles.activeTab]}
+            style={[
+              styles.tab,
+              active && {
+                backgroundColor: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
+              }
+            ]}
           >
             <Text
               style={[
                 styles.text,
-                { color: active ? COLORS.textPrimary : COLORS.textSecondary },
+                { color: active ? colors.textPrimary : colors.textSecondary },
               ]}
             >
               {item.toUpperCase()}
@@ -37,17 +45,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
   },
   tab: {
     flex: 1,
     paddingVertical: 10,
     alignItems: "center",
-  },
-  activeTab: {
-    backgroundColor: "rgba(255,255,255,0.12)",
   },
   text: {
     fontSize: 13,

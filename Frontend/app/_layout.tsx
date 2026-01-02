@@ -5,7 +5,7 @@ import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
-import { COLORS } from "../src/theme/colors";
+import { useThemeColors, useIsDarkMode } from "../src/theme/colors";
 
 // Keep splash screen visible while loading
 SplashScreen.preventAutoHideAsync();
@@ -44,10 +44,13 @@ function RootNavigator() {
 }
 
 export default function Layout() {
+  const colors = useThemeColors();
+  const isDark = useIsDarkMode();
+
   return (
     <SafeAreaProvider>
-      <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-        <StatusBar style="light" />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <StatusBar style={isDark ? "light" : "dark"} />
         <AuthProvider>
           <RootNavigator />
         </AuthProvider>

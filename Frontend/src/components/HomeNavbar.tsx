@@ -1,16 +1,18 @@
 // src/components/HomeNavbar.tsx
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
-import { COLORS } from "../theme/colors";
+import { useThemeColors } from "../theme/colors";
 import { router } from "expo-router";
 
 export default function HomeNavbar() {
+  const colors = useThemeColors();
+
   function handleAvatarPress() {
     router.push("/profile");
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>TryOn</Text>
+      <Text style={[styles.logo, { color: colors.textPrimary }]}>TryOn</Text>
 
       <TouchableOpacity onPress={handleAvatarPress} activeOpacity={0.7}>
         <Image
@@ -34,7 +36,6 @@ const styles = StyleSheet.create({
   logo: {
     fontSize: 22,
     fontWeight: "700",
-    color: COLORS.textPrimary,
   },
   avatar: {
     width: 36,

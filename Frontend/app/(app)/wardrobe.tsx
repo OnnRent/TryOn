@@ -1,7 +1,7 @@
 import { View, FlatList, ActivityIndicator, Text, StyleSheet, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useEffect } from "react";
-import { COLORS } from "../../src/theme/colors";
+import { useThemeColors } from "../../src/theme/colors";
 import WardrobeNavbar from "../../src/components/WardrobeNavbar";
 import WardrobeToggle from "../../src/components/WardrobeToggle";
 import WardrobeItemCard from "../../src/components/WardrobeItemCard";
@@ -20,6 +20,7 @@ type WardrobeItem = {
 };
 
 export default function WardrobeScreen() {
+  const colors = useThemeColors();
   const [active, setActive] = useState<"top" | "bottom">("top");
   const [showModal, setShowModal] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -138,20 +139,20 @@ export default function WardrobeScreen() {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <WardrobeNavbar onAdd={() => setShowModal(true)} />
 
       <WardrobeToggle active={active} onChange={setActive} />
 
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={COLORS.textPrimary} />
-          <Text style={styles.loadingText}>Loading wardrobe...</Text>
+          <ActivityIndicator size="large" color={colors.textPrimary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading wardrobe...</Text>
         </View>
       ) : filteredItems.length === 0 ? (
         <View style={styles.centerContainer}>
-          <Text style={styles.emptyText}>No {active} items yet</Text>
-          <Text style={styles.emptySubtext}>
+          <Text style={[styles.emptyText, { color: colors.textPrimary }]}>No {active} items yet</Text>
+          <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
             Tap + to add your first item
           </Text>
         </View>
@@ -213,16 +214,13 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: COLORS.textSecondary,
   },
   emptyText: {
     fontSize: 18,
     fontWeight: "600",
-    color: COLORS.textPrimary,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: COLORS.textSecondary,
   },
 });

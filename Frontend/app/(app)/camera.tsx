@@ -1,7 +1,7 @@
 import { View, TouchableOpacity, StyleSheet, Text, Alert } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState, useEffect } from "react";
-import { COLORS } from "../../src/theme/colors";
+import { useThemeColors, useIsDarkMode } from "../../src/theme/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import SelectClothesModal from "../../src/components/SelectClothesModal";
@@ -17,6 +17,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
 export default function CameraScreen() {
+  const colors = useThemeColors();
+  const isDark = useIsDarkMode();
   const cameraRef = useRef<CameraView | null>(null);
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
@@ -40,13 +42,13 @@ export default function CameraScreen() {
   }, []);
 
   if (!permission) {
-    return <View style={{ flex: 1, backgroundColor: COLORS.background }} />;
+    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   }
 
   if (!permission.granted) {
     return (
-      <View style={styles.center}>
-        <Text style={{ color: COLORS.textPrimary, marginBottom: 12 }}>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={{ color: colors.textPrimary, marginBottom: 12 }}>
           Camera access is required
         </Text>
         <TouchableOpacity onPress={requestPermission}>
@@ -96,16 +98,19 @@ export default function CameraScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style="light" />
 
         <View style={styles.topRightControls}>
           {/* Home */}
           <TouchableOpacity
-            style={styles.topIcon}
+            style={[
+              styles.topIcon,
+              { backgroundColor: isDark ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.9)" }
+            ]}
             onPress={() => router.replace("/")}
           >
-            <Ionicons name="home-outline" size={22} color="#fff" />
+            <Ionicons name="home-outline" size={22} color={isDark ? "#fff" : "#1A1A1A"} />
           </TouchableOpacity>
 
         </View>
@@ -184,27 +189,36 @@ export default function CameraScreen() {
                     styles.afterCaptureWrapper,
                   ]}
                 >
-                  <View style={styles.afterCapture}>
+                  <View style={[
+                    styles.afterCapture,
+                    { backgroundColor: isDark ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.9)" }
+                  ]}>
                     {/* Select Clothes */}
                     <TouchableOpacity
-                      style={styles.glassButton}
+                      style={[
+                        styles.glassButton,
+                        { backgroundColor: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)" }
+                      ]}
                       onPress={() => setShowSelectModal(true)}
                     >
-                      <Text style={styles.selectText}>Select Clothes</Text>
+                      <Text style={[styles.selectText, { color: isDark ? "#fff" : "#1A1A1A" }]}>Select Clothes</Text>
                     </TouchableOpacity>
                     {/* Retry */}
                     <TouchableOpacity
-                      style={styles.glassIcon}
+                      style={[
+                        styles.glassIcon,
+                        { backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }
+                      ]}
                       onPress={() => setPhotoUri(null)}
                     >
                       <Ionicons
                         name="refresh"
                         size={22}
-                        color={COLORS.textPrimary}
+                        color={isDark ? "#fff" : "#1A1A1A"}
                       />
                     </TouchableOpacity>
 
-                    
+
                   </View>
                 </View>
 
@@ -594,7 +608,6 @@ export default function CameraScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
 
   camera: {
@@ -625,35 +638,9 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.45)",
     borderWidth: 1.5,
     borderColor: "rgba(180,120,255,0.6)",
   },
-
-  // controls: {
-  //   position: "absolute",
-  //   bottom: 50,
-  //   width: "100%",
-  //   alignItems: "center",
-  //   justifyContent: "center",
-  // },
-
-  // captureOuter: {
-  //   width: 76,
-  //   height: 76,
-  //   borderRadius: 38,
-  //   borderWidth: 4,
-  //   borderColor: "#fff",
-  //   alignItems: "center",
-  //   justifyContent: "center",
-  // },
-
-  // captureInner: {
-  //   width: 58,
-  //   height: 58,
-  //   borderRadius: 29,
-  //   backgroundColor: "#fff",
-  // },
 
   afterCaptureWrapper: {
     position: "absolute",
@@ -668,7 +655,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 28,
-    backgroundColor: "rgba(0,0,0,0.45)",
     borderWidth: 1,
     borderColor: "rgba(0, 0, 0, 0.15)",
   },
@@ -679,7 +665,6 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
   },
 
   glassButton: {
@@ -688,7 +673,6 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.12)",
   },
 
 
@@ -700,7 +684,6 @@ const styles = StyleSheet.create({
   },
 
   selectText: {
-    color: COLORS.textPrimary,
     fontSize: 15,
     fontWeight: "600",
   },
@@ -709,7 +692,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.background,
   },
   controls: {
   position: "absolute",

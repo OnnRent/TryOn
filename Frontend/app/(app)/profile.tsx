@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "../../src/theme/colors";
+import { useThemeColors, useIsDarkMode } from "../../src/theme/colors";
 import { useAuth } from "../../src/context/AuthContext";
 import { router } from "expo-router";
 import { BlurView } from "expo-blur";
@@ -24,6 +24,8 @@ type UserData = {
 };
 
 export default function ProfileScreen() {
+  const colors = useThemeColors();
+  const isDark = useIsDarkMode();
   const { logout } = useAuth();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,23 +93,23 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.textPrimary} />
-          <Text style={styles.loadingText}>Loading profile...</Text>
+          <ActivityIndicator size="large" color={colors.textPrimary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading profile...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Profile</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -117,29 +119,29 @@ export default function ProfileScreen() {
       >
         {/* Account Details Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Details</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Account Details</Text>
 
-          <BlurView intensity={20} tint="dark" style={styles.card}>
+          <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
             <View style={styles.cardItem}>
-              <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} />
-              <Text style={styles.cardLabel}>Email</Text>
-              <Text style={styles.cardValue}>{userData?.email || "Not available"}</Text>
+              <Ionicons name="mail-outline" size={20} color={colors.textSecondary} />
+              <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>Email</Text>
+              <Text style={[styles.cardValue, { color: colors.textSecondary }]}>{userData?.email || "Not available"}</Text>
             </View>
           </BlurView>
 
-          <BlurView intensity={20} tint="dark" style={styles.card}>
+          <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
             <View style={styles.cardItem}>
-              <Ionicons name="shirt-outline" size={20} color={COLORS.textSecondary} />
-              <Text style={styles.cardLabel}>Wardrobe Items</Text>
-              <Text style={styles.cardValue}>{userData?.wardrobe_count || 0}</Text>
+              <Ionicons name="shirt-outline" size={20} color={colors.textSecondary} />
+              <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>Wardrobe Items</Text>
+              <Text style={[styles.cardValue, { color: colors.textSecondary }]}>{userData?.wardrobe_count || 0}</Text>
             </View>
           </BlurView>
 
-          <BlurView intensity={20} tint="dark" style={styles.card}>
+          <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
             <View style={styles.cardItem}>
-              <Ionicons name="calendar-outline" size={20} color={COLORS.textSecondary} />
-              <Text style={styles.cardLabel}>Member Since</Text>
-              <Text style={styles.cardValue}>
+              <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
+              <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>Member Since</Text>
+              <Text style={[styles.cardValue, { color: colors.textSecondary }]}>
                 {userData?.created_at
                   ? new Date(userData.created_at).toLocaleDateString('en-US', {
                       month: 'short',
@@ -154,14 +156,14 @@ export default function ProfileScreen() {
 
         {/* Subscription Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Subscription</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Subscription</Text>
 
           <TouchableOpacity onPress={() => router.push("/pricing")} activeOpacity={0.7}>
-            <BlurView intensity={20} tint="dark" style={styles.card}>
+            <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
               <View style={styles.cardItem}>
                 <Ionicons name="diamond-outline" size={20} color="#FFC107" />
-                <Text style={styles.cardLabel}>Pricing Plans</Text>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>Pricing Plans</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </View>
             </BlurView>
           </TouchableOpacity>
@@ -169,14 +171,14 @@ export default function ProfileScreen() {
 
         {/* Support Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Support</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Support</Text>
 
           <TouchableOpacity onPress={handleSupport} activeOpacity={0.7}>
-            <BlurView intensity={20} tint="dark" style={styles.card}>
+            <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
               <View style={styles.cardItem}>
-                <Ionicons name="help-circle-outline" size={20} color={COLORS.textSecondary} />
-                <Text style={styles.cardLabel}>Help & Support</Text>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                <Ionicons name="help-circle-outline" size={20} color={colors.textSecondary} />
+                <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>Help & Support</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </View>
             </BlurView>
           </TouchableOpacity>
@@ -184,24 +186,24 @@ export default function ProfileScreen() {
 
         {/* Legal Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Legal</Text>
-          
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Legal</Text>
+
           <TouchableOpacity onPress={handlePrivacyPolicy} activeOpacity={0.7}>
-            <BlurView intensity={20} tint="dark" style={styles.card}>
+            <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
               <View style={styles.cardItem}>
-                <Ionicons name="shield-outline" size={20} color={COLORS.textSecondary} />
-                <Text style={styles.cardLabel}>Privacy Policy</Text>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                <Ionicons name="shield-outline" size={20} color={colors.textSecondary} />
+                <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>Privacy Policy</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </View>
             </BlurView>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleTermsOfService} activeOpacity={0.7}>
-            <BlurView intensity={20} tint="dark" style={styles.card}>
+            <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
               <View style={styles.cardItem}>
-                <Ionicons name="document-text-outline" size={20} color={COLORS.textSecondary} />
-                <Text style={styles.cardLabel}>Terms of Service</Text>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                <Ionicons name="document-text-outline" size={20} color={colors.textSecondary} />
+                <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>Terms of Service</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </View>
             </BlurView>
           </TouchableOpacity>
@@ -224,7 +226,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
   loadingContainer: {
     flex: 1,
@@ -234,7 +235,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: COLORS.textSecondary,
   },
   header: {
     flexDirection: "row",
@@ -252,7 +252,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: COLORS.textPrimary,
   },
   scrollContent: {
     padding: 16,
@@ -264,7 +263,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: COLORS.textPrimary,
     marginBottom: 12,
     paddingLeft: 4,
   },
@@ -273,8 +271,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.04)",
   },
   cardItem: {
     flexDirection: "row",
@@ -285,12 +281,10 @@ const styles = StyleSheet.create({
   cardLabel: {
     flex: 1,
     fontSize: 15,
-    color: COLORS.textPrimary,
     fontWeight: "500",
   },
   cardValue: {
     fontSize: 14,
-    color: COLORS.textSecondary,
   },
   logoutButton: {
     flexDirection: "row",

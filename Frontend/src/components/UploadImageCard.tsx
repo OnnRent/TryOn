@@ -1,6 +1,6 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
+import { Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "../theme/colors";
+import { useThemeColors } from "../theme/colors";
 
 type Props = {
   label: string;
@@ -9,8 +9,10 @@ type Props = {
 };
 
 export default function UploadImageCard({ label, imageUri, onPress }: Props) {
+  const colors = useThemeColors();
+
   return (
-    <TouchableOpacity onPress={onPress} style={styles.card}>
+    <TouchableOpacity onPress={onPress} style={[styles.card, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
       {imageUri ? (
         <Image source={{ uri: imageUri }} style={styles.image} />
       ) : (
@@ -18,9 +20,9 @@ export default function UploadImageCard({ label, imageUri, onPress }: Props) {
           <Ionicons
             name="camera-outline"
             size={28}
-            color={COLORS.textSecondary}
+            color={colors.textSecondary}
           />
-          <Text style={styles.text}>{label}</Text>
+          <Text style={[styles.text, { color: colors.textSecondary }]}>{label}</Text>
         </>
       )}
     </TouchableOpacity>
@@ -34,9 +36,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
     overflow: "hidden",
   },
   image: {
@@ -47,6 +47,5 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13,
     fontWeight: "600",
-    color: COLORS.textSecondary,
   },
 });

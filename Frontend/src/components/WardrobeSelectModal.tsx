@@ -11,7 +11,7 @@ import {
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect } from "react";
-import { COLORS } from "../theme/colors";
+import { useThemeColors, useIsDarkMode } from "../theme/colors";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -44,6 +44,8 @@ export default function WardrobeSelectModal({
   onClose,
   onGenerate,
 }: Props) {
+  const colors = useThemeColors();
+  const isDark = useIsDarkMode();
   const [category, setCategory] = useState<"top" | "bottom">("top");
   const [selectedTop, setSelectedTop] = useState<Item | null>(null);
   const [selectedBottom, setSelectedBottom] = useState<Item | null>(null);
@@ -114,48 +116,53 @@ export default function WardrobeSelectModal({
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.overlay}>
-        <BlurView intensity={40} tint="dark" style={styles.sheet}>
+        <BlurView intensity={40} tint={isDark ? "dark" : "light"} style={[styles.sheet, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}>
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
                 onPress={() => {
-                    onClose();             
-                    router.push("/wardrobe"); 
+                    onClose();
+                    router.push("/wardrobe");
                 }}
                 >
               <Ionicons
                 name="add"
                 size={26}
-                color={COLORS.textPrimary}
+                color={colors.textPrimary}
               />
             </TouchableOpacity>
 
-            <Text style={styles.title}>Select Clothes</Text>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>Select Clothes</Text>
 
             <TouchableOpacity onPress={onClose}>
               <Ionicons
                 name="close"
                 size={26}
-                color={COLORS.textPrimary}
+                color={colors.textPrimary}
               />
             </TouchableOpacity>
           </View>
 
           {/* Toggle */}
-          <View style={styles.toggle}>
+          <View style={[styles.toggle, { backgroundColor: colors.glass }]}>
             {["top", "bottom"].map((v) => {
               const active = category === v;
               return (
                 <TouchableOpacity
                   key={v}
-                  style={[styles.toggleTab, active && styles.toggleActive]}
+                  style={[
+                    styles.toggleTab,
+                    active && {
+                      backgroundColor: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
+                    }
+                  ]}
                   onPress={() => setCategory(v as any)}
                 >
                   <Text
                     style={{
                       color: active
-                        ? COLORS.textPrimary
-                        : COLORS.textSecondary,
+                        ? colors.textPrimary
+                        : colors.textSecondary,
                       fontWeight: "600",
                     }}
                   >
@@ -169,18 +176,18 @@ export default function WardrobeSelectModal({
           {/* Grid */}
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.textPrimary} />
-              <Text style={styles.loadingText}>Loading {category}s...</Text>
+              <ActivityIndicator size="large" color={colors.textPrimary} />
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading {category}s...</Text>
             </View>
           ) : data.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Ionicons
                 name="shirt-outline"
                 size={48}
-                color={COLORS.textSecondary}
+                color={colors.textSecondary}
               />
-              <Text style={styles.emptyText}>No {category}s yet</Text>
-              <Text style={styles.emptySubtext}>
+              <Text style={[styles.emptyText, { color: colors.textPrimary }]}>No {category}s yet</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
                 Add items to your wardrobe first
               </Text>
             </View>
@@ -198,7 +205,7 @@ export default function WardrobeSelectModal({
 
                 return (
                   <TouchableOpacity
-                    style={[styles.card, isSelected && styles.selectedCard]}
+                    style={[styles.card, { backgroundColor: isDark ? "#222" : "#f0f0f0" }, isSelected && styles.selectedCard]}
                     onPress={() => onSelect(item)}
                     activeOpacity={0.85}
                   >
@@ -221,7 +228,7 @@ export default function WardrobeSelectModal({
           {/* Generate */}
           {canGenerate && (
             <TouchableOpacity
-              style={styles.generateBtn}
+              style={[styles.generateBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.08)" }]}
               onPress={() =>
                 onGenerate({
                   top: selectedTop || undefined,
@@ -229,7 +236,7 @@ export default function WardrobeSelectModal({
                 })
               }
             >
-              <Text style={styles.generateText}>
+              <Text style={[styles.generateText, { color: colors.textPrimary }]}>
                 Generate Image
               </Text>
             </TouchableOpacity>
@@ -254,8 +261,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.04)",
   },
 
   header: {
@@ -268,7 +273,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.textPrimary,
   },
 
   toggle: {
@@ -276,7 +280,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: "hidden",
     marginBottom: 16,
-    backgroundColor: "rgba(255,255,255,0.05)",
   },
 
   toggleTab: {
@@ -286,14 +289,12 @@ const styles = StyleSheet.create({
   },
 
   toggleActive: {
-    backgroundColor: "rgba(255,255,255,0.12)",
   },
 
   card: {
     flex: 1,
     aspectRatio: 3 / 4,
     borderRadius: 18,
-    backgroundColor: "#222",
     overflow: "hidden",
     position: "relative",
   },
@@ -330,7 +331,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: COLORS.textSecondary,
   },
 
   emptyContainer: {
@@ -343,13 +343,11 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: "600",
-    color: COLORS.textPrimary,
     marginTop: 16,
   },
 
   emptySubtext: {
     fontSize: 14,
-    color: COLORS.textSecondary,
     marginTop: 6,
   },
 
@@ -360,13 +358,11 @@ const styles = StyleSheet.create({
     right: 20,
     height: 52,
     borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.16)",
     alignItems: "center",
     justifyContent: "center",
   },
 
   generateText: {
-    color: COLORS.textPrimary,
     fontSize: 16,
     fontWeight: "700",
   },

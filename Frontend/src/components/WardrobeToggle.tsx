@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { COLORS } from "../theme/colors";
+import { useThemeColors, useIsDarkMode } from "../theme/colors";
 
 type Props = {
   active: "top" | "bottom";
@@ -7,20 +7,28 @@ type Props = {
 };
 
 export default function WardrobeToggle({ active, onChange }: Props) {
+  const colors = useThemeColors();
+  const isDark = useIsDarkMode();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
       {["top", "bottom"].map((item) => {
         const isActive = active === item;
         return (
           <TouchableOpacity
             key={item}
             onPress={() => onChange(item as any)}
-            style={[styles.tab, isActive && styles.activeTab]}
+            style={[
+              styles.tab,
+              isActive && {
+                backgroundColor: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
+              }
+            ]}
           >
             <Text
               style={[
                 styles.text,
-                { color: isActive ? COLORS.textPrimary : COLORS.textSecondary },
+                { color: isActive ? colors.textPrimary : colors.textSecondary },
               ]}
             >
               {item.toUpperCase()}
@@ -38,18 +46,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 18,
     borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
     overflow: "hidden",
   },
   tab: {
     flex: 1,
     paddingVertical: 10,
     alignItems: "center",
-  },
-  activeTab: {
-    backgroundColor: "rgba(255,255,255,0.12)",
   },
   text: {
     fontSize: 13,

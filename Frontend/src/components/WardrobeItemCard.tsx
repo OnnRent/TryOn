@@ -1,5 +1,6 @@
 import { Image, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useThemeColors } from "../theme/colors";
 
 type Props = {
   uri: string;
@@ -8,8 +9,10 @@ type Props = {
 };
 
 export default function WardrobeItemCard({ uri, onPress, onDelete }: Props) {
+  const colors = useThemeColors();
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
+    <TouchableOpacity style={[styles.card, { backgroundColor: colors.surface }]} onPress={onPress}>
       <Image source={{ uri }} style={styles.image} />
 
       {onDelete && (
@@ -33,7 +36,6 @@ const styles = StyleSheet.create({
     aspectRatio: 3 / 4,
     borderRadius: 18,
     overflow: "hidden",
-    backgroundColor: "#1a1a1a",
     position: "relative",
   },
   image: {
