@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator, Platform } from "react-native";
 import { BlurView } from "expo-blur";
 import { useState, useEffect } from "react";
 import { useThemeColors, useIsDarkMode } from "../theme/colors";
@@ -96,7 +96,15 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
       body: JSON.stringify({ category }),
     });
 
-    const data = await res.json();
+    // Safely parse response - handle non-JSON responses
+    const responseText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error("❌ Failed to parse response:", responseText);
+      throw new Error(`Server error: ${responseText.substring(0, 100)}`);
+    }
 
     if (!res.ok) {
       throw new Error(data.error || "Failed to create wardrobe item");
@@ -105,66 +113,104 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
     return data.wardrobe_item_id;
   }
 
-  // STEP 2: Upload images
-  async function uploadImages(wardrobeItemId: string) {
+  // STEP 2: Upload images using XMLHttpRequest for better Android compatibility
+  async function uploadImages(wardrobeItemId: string): Promise<any> {
     if (!frontImage || !backImage) {
       throw new Error("Both front and back images are required");
     }
 
     const token = await getAuthToken();
 
-    // Create FormData - React Native specific format
-    const formData = new FormData();
+    return new Promise((resolve, reject) => {
+      // Create FormData
+      const formData = new FormData();
 
-    // Get file info for front image
-    const frontFilename = frontImage.split('/').pop() || 'front.jpg';
-    const frontMatch = /\.(\w+)$/.exec(frontFilename);
-    const frontType = frontMatch ? `image/${frontMatch[1]}` : 'image/jpeg';
+      // Get file info for front image - use original URI as-is
+      const frontFilename = frontImage.split('/').pop() || 'front.jpg';
 
-    // Get file info for back image
-    const backFilename = backImage.split('/').pop() || 'back.jpg';
-    const backMatch = /\.(\w+)$/.exec(backFilename);
-    const backType = backMatch ? `image/${backMatch[1]}` : 'image/jpeg';
+      // Get file info for back image
+      const backFilename = backImage.split('/').pop() || 'back.jpg';
 
-    // Append images - React Native FormData format
-    formData.append('front', {
-      uri: frontImage,
-      name: frontFilename,
-      type: frontType,
-    } as any);
+      // Append images - React Native FormData format
+      formData.append('front', {
+        uri: frontImage,
+        name: frontFilename,
+        type: 'image/jpeg',
+      } as any);
 
-    formData.append('back', {
-      uri: backImage,
-      name: backFilename,
-      type: backType,
-    } as any);
+      formData.append('back', {
+        uri: backImage,
+        name: backFilename,
+        type: 'image/jpeg',
+      } as any);
 
-    formData.append('wardrobe_item_id', wardrobeItemId);
+      formData.append('wardrobe_item_id', wardrobeItemId);
 
-    console.log("📤 Uploading images...");
-    console.log("Wardrobe Item ID:", wardrobeItemId);
-    console.log("Front:", frontFilename, frontType);
-    console.log("Back:", backFilename, backType);
+      console.log("📤 Uploading images with XMLHttpRequest...");
+      console.log("Platform:", Platform.OS);
+      console.log("Wardrobe Item ID:", wardrobeItemId);
+      console.log("Front URI:", frontImage);
+      console.log("Back URI:", backImage);
 
-    const res = await fetch("https://api.tryonapp.in/wardrobe/image", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        // Don't set Content-Type - let fetch set it automatically with boundary
-      },
-      body: formData,
+      const xhr = new XMLHttpRequest();
+
+      xhr.onreadystatechange = () => {
+        console.log("📡 XHR readyState:", xhr.readyState, "status:", xhr.status);
+
+        if (xhr.readyState !== 4) return;
+
+        console.log("📥 XHR Final status:", xhr.status);
+        console.log("📥 XHR Response:", xhr.responseText?.substring(0, 500));
+
+        // Status 0 means network error (CORS, connection failed, etc.)
+        if (xhr.status === 0) {
+          console.error("❌ XHR status 0 - Network/CORS error");
+          reject(new Error("Network error: Could not connect to server. Please check your connection."));
+          return;
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            resolve(data);
+          } catch (e) {
+            console.error("❌ Failed to parse success response:", xhr.responseText);
+            // Still resolve since upload was successful
+            resolve({ message: "Upload completed" });
+          }
+        } else {
+          let errorMessage = `Upload failed (status ${xhr.status})`;
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            // Ensure error is a string
+            errorMessage = typeof errorData.error === 'string'
+              ? errorData.error
+              : JSON.stringify(errorData.error) || errorMessage;
+          } catch (e) {
+            const responsePreview = xhr.responseText?.substring(0, 100) || 'No response';
+            errorMessage = `${errorMessage}: ${responsePreview}`;
+          }
+          console.error("❌ Upload failed:", errorMessage);
+          reject(new Error(errorMessage));
+        }
+      };
+
+      xhr.onerror = () => {
+        console.error("❌ XHR Network error");
+        reject(new Error("Network error during upload. Please check your connection."));
+      };
+
+      xhr.ontimeout = () => {
+        console.error("❌ XHR Timeout");
+        reject(new Error("Upload timed out. Please try again."));
+      };
+
+      xhr.open('POST', 'https://api.tryonapp.in/wardrobe/image');
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.timeout = 120000; // 2 minute timeout
+      xhr.send(formData);
     });
-
-    const data = await res.json();
-    console.log("📥 Response status:", res.status);
-    console.log("📥 Response data:", data);
-
-    if (!res.ok) {
-      console.error("❌ Upload failed:", data);
-      throw new Error(data.error || "Failed to upload images");
-    }
-
-    return data;
   }
 
   // Main upload handler
@@ -227,6 +273,14 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
       return;
     }
 
+    // Image picker options - compress more on Android to avoid 503 errors
+    const imageOptions: ImagePicker.ImagePickerOptions = {
+      quality: Platform.OS === 'android' ? 0.5 : 0.8, // Lower quality on Android
+      allowsEditing: true,
+      aspect: [3, 4] as [number, number], // Consistent aspect ratio
+      exif: false, // Don't include EXIF data to reduce size
+    };
+
     Alert.alert("Select Image", "Choose image source", [
         {
         text: "Camera",
@@ -234,13 +288,11 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
             const granted = await requestCameraPermission();
             if (!granted) return;
 
-            const result = await ImagePicker.launchCameraAsync({
-            quality: 0.8,
-            allowsEditing: true,
-            });
+            const result = await ImagePicker.launchCameraAsync(imageOptions);
 
             if (!result.canceled) {
             const uri = result.assets[0].uri;
+            console.log(`📸 Camera image size: ${result.assets[0].fileSize || 'unknown'} bytes`);
             type === "front" ? setFrontImage(uri) : setBackImage(uri);
             }
         },
@@ -251,13 +303,11 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
             const granted = await requestGalleryPermission();
             if (!granted) return;
 
-            const result = await ImagePicker.launchImageLibraryAsync({
-            quality: 0.8,
-            allowsEditing: true,
-            });
+            const result = await ImagePicker.launchImageLibraryAsync(imageOptions);
 
             if (!result.canceled) {
             const uri = result.assets[0].uri;
+            console.log(`🖼️ Gallery image size: ${result.assets[0].fileSize || 'unknown'} bytes`);
             type === "front" ? setFrontImage(uri) : setBackImage(uri);
             }
         },

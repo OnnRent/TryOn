@@ -17,8 +17,14 @@ const { createToken, verifyToken } = require("./auth/jwt");
 const serverless = require("serverless-http");
 
 app.use(cors({
-  origin: "*"
+  origin: "*",
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  credentials: false,
 }));
+
+// Handle preflight requests explicitly
+app.options('*', cors());
 
 // Webhook endpoint needs raw body
 app.use("/payment/webhook", express.raw({ type: "application/json" }));

@@ -12,7 +12,8 @@ import { useThemeColors, useIsDarkMode } from "../src/theme/colors";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const DEV_MODE = __DEV__;
+// const DEV_MODE = __DEV__;
+
 
 const { width, height } = Dimensions.get("window");
 
@@ -734,7 +735,7 @@ export default function SignInScreen() {
                   />
                 </View>
               )}
-              {DEV_MODE && (
+              {/* {DEV_MODE && (
                 <TouchableOpacity
                   style={[styles.devButton, { backgroundColor: isDark ? "#374151" : "#e5e7eb" }]}
                   onPress={signInDev}
@@ -744,7 +745,16 @@ export default function SignInScreen() {
                     Dev Sign In (localhost)
                   </Text>
                 </TouchableOpacity>
-              )}
+              )} */}
+              <TouchableOpacity
+                  style={[styles.devButton, { backgroundColor: isDark ? "#374151" : "#e5e7eb" }]}
+                  onPress={signInDev}
+                >
+                  <Ionicons name="code-slash" size={20} color={isDark ? "#fff" : "#1f2937"} />
+                  <Text style={[styles.devButtonText, { color: isDark ? "#fff" : "#1f2937" }]}>
+                    Dev Sign In (localhost)
+                  </Text>
+                </TouchableOpacity>
             </>
           )}
 
