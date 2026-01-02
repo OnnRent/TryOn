@@ -1,31 +1,80 @@
 const axios = require("axios");
 const { GoogleAuth } = require("google-auth-library");
 const sharp = require("sharp");
-const fs = require("fs");
 
 /**
- * Setup Google Cloud credentials for Vercel/serverless environments
+ * Get Google Cloud credentials for Vercel/serverless environments
+ * Supports both full JSON and individual env vars
+ * @returns {Object|null} credentials object or null if not found
  */
-function setupGoogleCredentials() {
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    const credPath = '/tmp/gcp-key.json';
+function getGoogleCredentials() {
+  console.log("🔧 Loading Google Cloud credentials...");
+
+  // Debug: Log all GCP-related env vars (existence only, not values)
+  console.log("ENV VAR CHECK:");
+  console.log("  GCP_PROJECT_ID:", !!process.env.GCP_PROJECT_ID);
+  console.log("  GCP_CLIENT_EMAIL:", !!process.env.GCP_CLIENT_EMAIL);
+  console.log("  GCP_PRIVATE_KEY:", !!process.env.GCP_PRIVATE_KEY);
+  console.log("  GCP_PRIVATE_KEY length:", process.env.GCP_PRIVATE_KEY?.length || 0);
+  console.log("  GOOGLE_APPLICATION_CREDENTIALS_JSON:", !!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+
+  // Also check common alternative names
+  console.log("  private_key:", !!process.env.private_key);
+  console.log("  client_email:", !!process.env.client_email);
+  console.log("  project_id:", !!process.env.project_id);
+
+  let credentials = null;
+
+  // Option 1: Full JSON in single env var
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
     try {
-      fs.writeFileSync(credPath, process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-      process.env.GOOGLE_APPLICATION_CREDENTIALS = credPath;
-      console.log("✅ Google Cloud credentials configured from JSON env var");
+      credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+      console.log("✅ Using GOOGLE_APPLICATION_CREDENTIALS_JSON");
     } catch (err) {
-      console.error("❌ Failed to write GCP credentials:", err.message);
+      console.error("❌ Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON:", err.message);
     }
   }
 
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.log("✅ Using credentials file:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
-    if (!fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
-      console.error("❌ Credentials file not found:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
-    }
-  } else {
-    console.warn("⚠️ GOOGLE_APPLICATION_CREDENTIALS not set, will try default credentials");
+  // Option 2: Build from individual env vars (try multiple naming conventions)
+  const clientEmail = process.env.GCP_CLIENT_EMAIL || process.env.client_email;
+  const privateKey = process.env.GCP_PRIVATE_KEY || process.env.private_key;
+  const projectId = process.env.GCP_PROJECT_ID || process.env.project_id;
+
+  if (!credentials && clientEmail && privateKey) {
+    console.log("✅ Building credentials from individual env vars");
+    console.log("  Using client_email:", clientEmail);
+    console.log("  Using project_id:", projectId);
+    console.log("  Private key length:", privateKey?.length);
+
+    // Handle escaped newlines in private key
+    const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+
+    credentials = {
+      type: "service_account",
+      project_id: projectId,
+      private_key_id: process.env.GCP_PRIVATE_KEY_ID || process.env.private_key_id || "",
+      private_key: formattedPrivateKey,
+      client_email: clientEmail,
+      client_id: process.env.GCP_CLIENT_ID || process.env.client_id || "",
+      auth_uri: "https://accounts.google.com/o/oauth2/auth",
+      token_uri: "https://oauth2.googleapis.com/token",
+      auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+      client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(clientEmail)}`
+    };
   }
+
+  if (credentials) {
+    console.log("✅ Credentials loaded successfully");
+    console.log("  Project ID:", credentials.project_id);
+    console.log("  Client Email:", credentials.client_email);
+  } else {
+    console.error("❌ No credentials found! Set either:");
+    console.error("   - GOOGLE_APPLICATION_CREDENTIALS_JSON (full JSON)");
+    console.error("   - OR: GCP_PROJECT_ID, GCP_CLIENT_EMAIL, GCP_PRIVATE_KEY");
+    console.error("   - OR: project_id, client_email, private_key");
+  }
+
+  return credentials;
 }
 
 /**
@@ -37,16 +86,22 @@ function setupGoogleCredentials() {
  */
 async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothingType) {
   try {
-    setupGoogleCredentials();
+    // Get credentials from env vars
+    const credentials = getGoogleCredentials();
 
-    const projectId = process.env.GCP_PROJECT_ID;
-    const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
+    if (!credentials) {
+      throw new Error("Google Cloud credentials not configured. Set GCP_PROJECT_ID, GCP_CLIENT_EMAIL, and GCP_PRIVATE_KEY environment variables.");
+    }
+
+    const projectId = credentials.project_id || process.env.GCP_PROJECT_ID;
+    // Gemini 3 preview models require "global" location
+    const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
     console.log("GCP_PROJECT_ID:", projectId);
     console.log("GOOGLE_CLOUD_LOCATION:", location);
     console.log("👕 Clothing type:", clothingType || "top");
 
     if (!projectId) {
-      throw new Error("GCP_PROJECT_ID not found in environment variables");
+      throw new Error("GCP_PROJECT_ID not found in environment variables or credentials");
     }
 
     console.log("🔧 Preprocessing images for Gemini 3 Pro Image...");
@@ -71,9 +126,10 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
     const personImageBase64 = processedPersonImage.toString("base64");
     const clothingImageBase64 = processedClothingImage.toString("base64");
 
-    // Get access token
+    // Get access token - pass credentials directly
     console.log("🔑 Authenticating with Google Cloud...");
     const auth = new GoogleAuth({
+      credentials: credentials,
       scopes: ["https://www.googleapis.com/auth/cloud-platform"],
     });
     const client = await auth.getClient();
