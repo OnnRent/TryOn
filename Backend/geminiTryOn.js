@@ -3,12 +3,25 @@ const { GoogleAuth } = require("google-auth-library");
 const sharp = require("sharp");
 
 /**
+ * Check if we should use Google AI API (with API key) or Vertex AI (with service account)
+ */
+function useGoogleAI() {
+  return !!process.env.GOOGLE_AI_API_KEY || !!process.env.GEMINI_API_KEY;
+}
+
+/**
  * Get Google Cloud credentials for Vercel/serverless environments
  * Supports both full JSON and individual env vars
  * @returns {Object|null} credentials object or null if not found
  */
 function getGoogleCredentials() {
-  console.log("🔧 Loading Google Cloud credentials...");
+  // If using Google AI API with API key, no credentials needed
+  if (useGoogleAI()) {
+    console.log("✅ Using Google AI API with API key");
+    return null;
+  }
+
+  console.log("🔧 Loading Google Cloud credentials for Vertex AI...");
 
   // Debug: Log all GCP-related env vars (existence only, not values)
   console.log("ENV VAR CHECK:");
@@ -86,124 +99,114 @@ function getGoogleCredentials() {
  */
 async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothingType) {
   try {
-    // Get credentials from env vars
-    const credentials = getGoogleCredentials();
+    const isGoogleAI = useGoogleAI();
+    const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+    const credentials = isGoogleAI ? null : getGoogleCredentials();
 
-    if (!credentials) {
-      throw new Error("Google Cloud credentials not configured. Set GCP_PROJECT_ID, GCP_CLIENT_EMAIL, and GCP_PRIVATE_KEY environment variables.");
+    if (!isGoogleAI && !credentials) {
+      throw new Error("No credentials configured. Set GEMINI_API_KEY for Google AI, or GCP_PROJECT_ID + GCP_CLIENT_EMAIL + GCP_PRIVATE_KEY for Vertex AI.");
     }
 
-    const projectId = credentials.project_id || process.env.GCP_PROJECT_ID;
-    // Gemini 3 Pro Image supports global endpoint
-    const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
-    console.log("GCP_PROJECT_ID:", projectId);
-    console.log("GOOGLE_CLOUD_LOCATION:", location);
+    console.log(`🔧 Using ${isGoogleAI ? 'Google AI API' : 'Vertex AI'}`);
     console.log("👕 Clothing type:", clothingType || "top");
 
-    if (!projectId) {
-      throw new Error("GCP_PROJECT_ID not found in environment variables or credentials");
+    console.log("🔧 Preprocessing images...");
+
+    // Process images in parallel
+    const imageProcessing = Promise.all([
+      sharp(personImageBuffer)
+        .rotate()
+        .resize(768, 1024, { fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 85 })
+        .toBuffer(),
+      sharp(clothingImageBuffer)
+        .rotate()
+        .resize(768, 1024, { fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 90 })
+        .toBuffer(),
+    ]);
+
+    // Get auth token if using Vertex AI
+    let accessToken = null;
+    if (!isGoogleAI) {
+      const auth = new GoogleAuth({
+        credentials: credentials,
+        scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+      });
+      const client = await auth.getClient();
+      accessToken = await client.getAccessToken();
+      if (!accessToken.token) {
+        throw new Error("Failed to get access token for Vertex AI");
+      }
     }
 
-    console.log("🔧 Preprocessing images for Gemini 3 Pro Image...");
-
-    // Preprocess person image - higher quality for face preservation
-    const processedPersonImage = await sharp(personImageBuffer)
-      .rotate()
-      .resize(1024, 1365, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 95 })
-      .toBuffer();
-
-    // Preprocess clothing image - PNG for exact color preservation
-    const processedClothingImage = await sharp(clothingImageBuffer)
-      .rotate()
-      .resize(1024, 1365, { fit: "inside", withoutEnlargement: true })
-      .png({ quality: 100 })
-      .toBuffer();
+    const [processedPersonImage, processedClothingImage] = await imageProcessing;
 
     console.log(`📊 Image sizes: Person=${(processedPersonImage.length / 1024).toFixed(1)}KB, Clothing=${(processedClothingImage.length / 1024).toFixed(1)}KB`);
 
-    // Convert to base64
     const personImageBase64 = processedPersonImage.toString("base64");
     const clothingImageBase64 = processedClothingImage.toString("base64");
 
-    // Get access token - pass credentials directly
-    console.log("🔑 Authenticating with Google Cloud...");
-    const auth = new GoogleAuth({
-      credentials: credentials,
-      scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-    });
-    const client = await auth.getClient();
-    const accessToken = await client.getAccessToken();
-
-    if (!accessToken.token) {
-      throw new Error("Failed to get access token for Vertex AI");
-    }
-
-    // Build the prompt for virtual try-on with strict preservation instructions
+    // Build the prompt
     const clothingDescription = clothingType === "bottom" ? "pants/bottom wear" :
                                 clothingType === "full" ? "full outfit" : "top/shirt";
 
     const prompt = `You are a professional virtual try-on system. Generate a photorealistic image of the person in the first image wearing the ${clothingDescription} shown in the second image.
 
-CRITICAL REQUIREMENTS - YOU MUST FOLLOW THESE EXACTLY:
-1. FACE PRESERVATION: Keep the person's face EXACTLY as it appears - same expression, same features, same lighting on face. Do NOT modify, enhance, or change the facial expression in any way.
-2. CLOTHING COLOR: Use the EXACT colors from the clothing image. Do NOT change, adjust, or modify the clothing colors at all. The colors must match the original clothing image precisely.
-3. CLOTHING DESIGN: Preserve all patterns, textures, logos, and design elements from the clothing image exactly as shown.
-4. BODY POSITION: Maintain the person's exact pose and body position from the original photo.
-5. BACKGROUND: Keep the original background from the person's photo.
-6. LIGHTING: Match the lighting conditions from the person's original photo.
-7. REALISTIC FIT: Make the clothing fit naturally on the person's body while maintaining all the above requirements.
+CRITICAL REQUIREMENTS:
+1. FACE PRESERVATION: Keep the person's face EXACTLY as it appears.
+2. CLOTHING COLOR: Use the EXACT colors from the clothing image.
+3. CLOTHING DESIGN: Preserve all patterns, textures, logos exactly.
+4. BODY POSITION: Maintain the person's exact pose.
+5. BACKGROUND: Keep the original background.
+6. REALISTIC FIT: Make the clothing fit naturally.
 
 Generate a single high-quality photorealistic image.`;
 
-    // Prepare request for Gemini 3 Pro Image
+    // Prepare request body
     const requestBody = {
       contents: [
         {
           role: "user",
           parts: [
             { text: prompt },
-            {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: personImageBase64
-              }
-            },
-            {
-              inlineData: {
-                mimeType: "image/png",
-                data: clothingImageBase64
-              }
-            }
+            { inlineData: { mimeType: "image/jpeg", data: personImageBase64 } },
+            { inlineData: { mimeType: "image/jpeg", data: clothingImageBase64 } }
           ]
         }
       ],
       generationConfig: {
         responseModalities: ["IMAGE", "TEXT"],
-        temperature: 0.2, // Lower temperature for more consistent/faithful output
+        temperature: 0.2,
       }
     };
 
-    // Gemini 3 Pro Image for virtual try-on
-    const modelVersion = process.env.GEMINI_IMAGE_MODEL || "gemini-3-pro-image-preview";
+    const modelVersion = process.env.GEMINI_IMAGE_MODEL || "gemini-2.0-flash-exp";
+    let endpoint, headers;
 
-    // For global endpoint, use aiplatform.googleapis.com (no location prefix)
-    // For regional endpoints, use {location}-aiplatform.googleapis.com
-    const hostname = location === "global"
-      ? "aiplatform.googleapis.com"
-      : `${location}-aiplatform.googleapis.com`;
-    const endpoint = `https://${hostname}/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelVersion}:generateContent`;
-
-    console.log("🎨 Sending request to Gemini 3 Pro Image API...");
-    console.log(`📍 Model: ${modelVersion}`);
-    console.log(`📍 Endpoint: ${endpoint}`);
-
-    const response = await axios.post(endpoint, requestBody, {
-      headers: {
+    if (isGoogleAI) {
+      // Google AI API (simpler, uses API key)
+      endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelVersion}:generateContent?key=${apiKey}`;
+      headers = { "Content-Type": "application/json" };
+    } else {
+      // Vertex AI (uses service account)
+      const projectId = credentials.project_id || process.env.GCP_PROJECT_ID;
+      const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
+      const hostname = location === "global" ? "aiplatform.googleapis.com" : `${location}-aiplatform.googleapis.com`;
+      endpoint = `https://${hostname}/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelVersion}:generateContent`;
+      headers = {
         Authorization: `Bearer ${accessToken.token}`,
         "Content-Type": "application/json",
-      },
-      timeout: 180000, // 3 minute timeout for image generation
+      };
+    }
+
+    console.log("🎨 Sending request to Gemini API...");
+    console.log(`📍 Model: ${modelVersion}`);
+    console.log(`📍 Endpoint: ${endpoint.replace(apiKey || '', '***')}`);
+
+    const response = await axios.post(endpoint, requestBody, {
+      headers,
+      timeout: 180000,
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
     });
