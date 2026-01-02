@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
-import { useThemeColors, useIsDarkMode } from "../theme/colors";
+import { COLORS } from "../theme/colors";
 
 const { width } = Dimensions.get("window");
 
@@ -24,16 +24,13 @@ export default function ImagePreviewModal({
   images,
   onClose,
 }: Props) {
-  const colors = useThemeColors();
-  const isDark = useIsDarkMode();
-
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
         {/* Header */}
-        <BlurView intensity={30} tint={isDark ? "dark" : "light"} style={styles.header}>
+        <BlurView intensity={30} tint="dark" style={styles.header}>
           <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={26} color={colors.textPrimary} />
+            <Ionicons name="close" size={26} color={COLORS.textPrimary} />
           </TouchableOpacity>
         </BlurView>
 

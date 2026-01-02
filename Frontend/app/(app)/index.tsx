@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
 import { useThemeColors, useIsDarkMode } from "../../src/theme/colors";
 
 const API_URL = "https://api.tryonapp.in";
@@ -34,7 +35,7 @@ export default function HomeScreen() {
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     fetchData();
@@ -42,12 +43,12 @@ export default function HomeScreen() {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 800,
+        duration: 600,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 800,
+        duration: 600,
         useNativeDriver: true,
       }),
     ]).start();
@@ -139,9 +140,12 @@ export default function HomeScreen() {
             }
           ]}
         >
-          <Text style={[styles.appName, { color: colors.textPrimary }]}>TryOn</Text>
+          <View>
+            <Text style={[styles.greeting, { color: colors.textSecondary }]}>Welcome back</Text>
+            <Text style={[styles.appName, { color: colors.textPrimary }]}>TryOn</Text>
+          </View>
           <TouchableOpacity
-            style={[styles.profileButton, { borderColor: colors.cardBorder }]}
+            style={[styles.profileButton, { backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)" }]}
             onPress={() => router.push("/profile")}
           >
             <Image
@@ -151,10 +155,10 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Credits Badge */}
+        {/* Hero Card - Try On */}
         <Animated.View
           style={[
-            styles.creditsBadgeContainer,
+            styles.heroSection,
             {
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
@@ -162,71 +166,108 @@ export default function HomeScreen() {
           ]}
         >
           <TouchableOpacity
-            style={[styles.creditsBadge, { backgroundColor: colors.accentBackground, borderColor: colors.accentBorder }]}
-            onPress={() => router.push("/pricing")}
-            activeOpacity={0.8}
+            style={[styles.heroCard]}
+            onPress={() => router.push("/camera")}
+            activeOpacity={0.9}
           >
-            <View style={[styles.creditsIconContainer, { backgroundColor: colors.accentBackground }]}>
-              <Ionicons name="diamond" size={24} color={colors.accent} />
-            </View>
-            <View style={styles.creditsInfo}>
-              <Text style={[styles.creditsLabel, { color: colors.textSecondary }]}>Available Try-Ons</Text>
-              <Text style={[styles.creditsCount, { color: colors.accent }]}>{credits.available_tryons}</Text>
-            </View>
-            <Ionicons name="add-circle" size={28} color={colors.accent} />
+            <LinearGradient
+              colors={isDark ? ["#1a1a2e", "#16213e", "#0f0f23"] : ["#667eea", "#764ba2", "#f093fb"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroGradient}
+            >
+              <View style={styles.heroContent}>
+                <View style={styles.heroIconContainer}>
+                  <Ionicons name="sparkles" size={28} color="#fff" />
+                </View>
+                <Text style={styles.heroTitle}>Start Try-On</Text>
+                <Text style={styles.heroSubtitle}>See yourself in any outfit instantly</Text>
+              </View>
+              <View style={styles.heroArrow}>
+                <Ionicons name="arrow-forward-circle" size={48} color="rgba(255,255,255,0.9)" />
+              </View>
+            </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Quick Actions - Bento Grid */}
+        {/* Stats Row */}
         <Animated.View
           style={[
-            styles.bentoGrid,
+            styles.statsRow,
             {
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
             }
           ]}
         >
-          {/* Large Card - Try On */}
+          {/* Credits Card */}
           <TouchableOpacity
-            style={[styles.bentoCard, styles.bentoLarge, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-            onPress={() => router.push("/camera")}
+            style={[styles.statCard, { backgroundColor: isDark ? "rgba(212, 175, 55, 0.12)" : "rgba(212, 175, 55, 0.15)", borderColor: colors.accentBorder }]}
+            onPress={() => router.push("/pricing")}
             activeOpacity={0.8}
           >
-            <View style={styles.cardContent}>
-              <View style={[styles.iconContainer, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
-                <Ionicons name="camera" size={32} color={colors.textPrimary} />
-              </View>
-              <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Virtual Try-On</Text>
-              <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>See yourself in new outfits</Text>
+            <View style={styles.statIconBg}>
+              <Ionicons name="diamond" size={20} color={colors.accent} />
             </View>
-            <View style={[styles.cardGlow, { backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)" }]} />
+            <Text style={[styles.statValue, { color: colors.accent }]}>{credits.available_tryons}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Credits</Text>
           </TouchableOpacity>
 
-          {/* Small Cards Row */}
-          <View style={styles.bentoRow}>
+          {/* Wardrobe Card */}
+          <TouchableOpacity
+            style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+            onPress={() => router.push("/wardrobe")}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.statIconBg, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)" }]}>
+              <Ionicons name="shirt-outline" size={20} color={colors.textPrimary} />
+            </View>
+            <Text style={[styles.statValue, { color: colors.textPrimary }]}>{wardrobeCount}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Wardrobe</Text>
+          </TouchableOpacity>
+
+          {/* Gallery Card */}
+          <TouchableOpacity
+            style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+            onPress={() => router.push("/images")}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.statIconBg, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)" }]}>
+              <Ionicons name="images-outline" size={20} color={colors.textPrimary} />
+            </View>
+            <Text style={[styles.statValue, { color: colors.textPrimary }]}>{generatedImages.length}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Gallery</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Quick Actions */}
+        <Animated.View
+          style={[
+            styles.quickActions,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }
+          ]}
+        >
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Quick Actions</Text>
+          <View style={styles.actionGrid}>
             <TouchableOpacity
-              style={[styles.bentoCard, styles.bentoSmall, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+              style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
               onPress={() => router.push("/wardrobe")}
               activeOpacity={0.8}
             >
-              <View style={[styles.iconContainer, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
-                <Ionicons name="shirt" size={24} color={colors.textPrimary} />
-              </View>
-              <Text style={[styles.cardTitleSmall, { color: colors.textPrimary }]}>Wardrobe</Text>
-              <Text style={[styles.statNumber, { color: colors.textPrimary }]}>{wardrobeCount}</Text>
+              <Ionicons name="add-circle-outline" size={28} color={colors.textPrimary} />
+              <Text style={[styles.actionText, { color: colors.textPrimary }]}>Add Clothes</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.bentoCard, styles.bentoSmall, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-              onPress={() => router.push("/images")}
+              style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+              onPress={() => router.push("/pricing")}
               activeOpacity={0.8}
             >
-              <View style={[styles.iconContainer, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
-                <Ionicons name="images" size={24} color={colors.textPrimary} />
-              </View>
-              <Text style={[styles.cardTitleSmall, { color: colors.textPrimary }]}>Gallery</Text>
-              <Text style={[styles.statNumber, { color: colors.textPrimary }]}>{generatedImages.length}</Text>
+              <Ionicons name="flash-outline" size={28} color={colors.accent} />
+              <Text style={[styles.actionText, { color: colors.textPrimary }]}>Get Credits</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -242,9 +283,9 @@ export default function HomeScreen() {
             ]}
           >
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Recent Generations</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Recent</Text>
               <TouchableOpacity onPress={() => router.push("/images")}>
-                <Text style={[styles.seeAll, { color: colors.textSecondary }]}>See All</Text>
+                <Text style={[styles.seeAll, { color: colors.accent }]}>See All →</Text>
               </TouchableOpacity>
             </View>
 
@@ -256,8 +297,8 @@ export default function HomeScreen() {
               {generatedImages.map((image) => (
                 <TouchableOpacity
                   key={image.id}
-                  style={[styles.recentCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-                  activeOpacity={0.8}
+                  style={[styles.recentCard, { borderColor: colors.cardBorder }]}
+                  activeOpacity={0.9}
                   onPress={() => router.push("/images")}
                 >
                   <Image
@@ -265,9 +306,6 @@ export default function HomeScreen() {
                     style={styles.recentImage}
                     contentFit="cover"
                   />
-                  <View style={styles.recentOverlay}>
-                    <Ionicons name="eye" size={32} color="rgba(255,255,255,0.9)" />
-                  </View>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -279,16 +317,25 @@ export default function HomeScreen() {
           <Animated.View
             style={[
               styles.emptyState,
+              { backgroundColor: colors.surface, borderColor: colors.cardBorder },
               {
                 opacity: fadeAnim,
               }
             ]}
           >
-            <Ionicons name="images-outline" size={64} color={colors.cardBorder} />
-            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Generations Yet</Text>
+            <View style={[styles.emptyIconBg, { backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)" }]}>
+              <Ionicons name="sparkles-outline" size={40} color={colors.textSecondary} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Ready to transform?</Text>
             <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-              Start creating virtual try-ons to see them here
+              Take a photo and try on any outfit
             </Text>
+            <TouchableOpacity
+              style={[styles.emptyButton, { backgroundColor: colors.accent }]}
+              onPress={() => router.push("/camera")}
+            >
+              <Text style={styles.emptyButtonText}>Start Now</Text>
+            </TouchableOpacity>
           </Animated.View>
         )}
       </ScrollView>
@@ -317,129 +364,132 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingTop: 20,
+    paddingBottom: 16,
   },
-  creditsBadgeContainer: {
-    paddingHorizontal: 24,
-    marginBottom: 20,
+  greeting: {
+    fontSize: 14,
+    marginBottom: 2,
   },
-  creditsBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 12,
+  appName: {
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.5,
   },
-  creditsIconContainer: {
+  profileButton: {
+    borderRadius: 24,
+    padding: 2,
+  },
+  avatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
   },
-  creditsInfo: {
+  heroSection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  heroCard: {
+    borderRadius: 24,
+    overflow: "hidden",
+  },
+  heroGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 24,
+    minHeight: 140,
+  },
+  heroContent: {
     flex: 1,
   },
-  creditsLabel: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  creditsCount: {
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  appName: {
-    fontSize: 32,
-    fontWeight: "900",
-    letterSpacing: -1,
-  },
-  profileButton: {
-    borderRadius: 50,
-    borderWidth: 2,
-  },
-  avatar: {
+  heroIconContainer: {
     width: 48,
     height: 48,
-    borderRadius: 24,
-  },
-  bentoGrid: {
-    paddingHorizontal: 20,
-    gap: 16,
-  },
-  bentoCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    overflow: "hidden",
-    position: "relative",
-  },
-  bentoLarge: {
-    height: 200,
-    padding: 24,
-    justifyContent: "space-between",
-  },
-  bentoRow: {
-    flexDirection: "row",
-    gap: 16,
-  },
-  bentoSmall: {
-    flex: 1,
-    height: 160,
-    padding: 20,
-    justifyContent: "space-between",
-  },
-  cardContent: {
-    zIndex: 1,
-  },
-  iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
-    borderWidth: 1,
+    marginBottom: 12,
   },
-  cardTitle: {
+  heroTitle: {
     fontSize: 24,
-    fontWeight: "700",
-    marginBottom: 6,
+    fontWeight: "800",
+    color: "#fff",
+    marginBottom: 4,
   },
-  cardSubtitle: {
+  heroSubtitle: {
     fontSize: 14,
+    color: "rgba(255,255,255,0.8)",
   },
-  cardTitleSmall: {
-    fontSize: 16,
-    fontWeight: "600",
+  heroArrow: {
+    marginLeft: 16,
+  },
+  statsRow: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    gap: 12,
+    marginBottom: 24,
+  },
+  statCard: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  statIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 8,
   },
-  statNumber: {
-    fontSize: 28,
+  statValue: {
+    fontSize: 22,
     fontWeight: "800",
+    marginBottom: 2,
   },
-  cardGlow: {
-    position: "absolute",
-    bottom: -50,
-    right: -50,
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+  statLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  quickActions: {
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  actionGrid: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  actionCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   recentSection: {
-    marginTop: 32,
+    marginTop: 24,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   seeAll: {
     fontSize: 14,
@@ -447,51 +497,53 @@ const styles = StyleSheet.create({
   },
   recentScroll: {
     paddingHorizontal: 20,
-    gap: 16,
+    gap: 12,
   },
   recentCard: {
-    width: 160,
-    height: 220,
-    borderRadius: 20,
+    width: 140,
+    height: 200,
+    borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1,
-    position: "relative",
   },
   recentImage: {
     width: "100%",
     height: "100%",
   },
-  recentOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.3)",
+  emptyState: {
+    marginTop: 32,
+    marginHorizontal: 20,
+    padding: 32,
+    borderRadius: 24,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  emptyIconBg: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-  },
-  emptyState: {
-    marginTop: 60,
-    paddingHorizontal: 40,
-    alignItems: "center",
-    gap: 16,
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
-    marginTop: 16,
   },
   emptySubtitle: {
-    fontSize: 15,
+    fontSize: 14,
     textAlign: "center",
-    lineHeight: 22,
+    marginTop: 4,
+    marginBottom: 16,
   },
   emptyButton: {
-    marginTop: 8,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 16,
-    borderWidth: 1,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
   emptyButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#fff",
   },
 });

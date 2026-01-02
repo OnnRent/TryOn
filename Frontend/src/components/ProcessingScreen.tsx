@@ -28,7 +28,7 @@ export default function ProcessingScreen() {
 
       {/* Tertiary / reassurance */}
       <Text style={[styles.hint, { color: colors.textSecondary }]}>
-        This usually takes just a few seconds
+        This usually takes around 30-45 seconds
       </Text>
     </View>
   );
