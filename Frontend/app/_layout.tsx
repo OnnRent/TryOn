@@ -32,6 +32,9 @@ function RootNavigator() {
         router.replace("/(app)");
       }
       
+
+      //For Testing
+      // router.replace("/(app)");
       SplashScreen.hideAsync();
     }, 0);
   }, [token, checked]);

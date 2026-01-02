@@ -320,8 +320,7 @@ export default function SignInScreen() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: "dev@test.com",
-          name: "Dev User",
+          devSecret: "tryon-dev-2024",
         }),
       });
 

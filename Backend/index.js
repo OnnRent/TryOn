@@ -1204,25 +1204,36 @@ app.get("/auth/dev-token", async (req, res) => {
   });
 });
 
-// For Testing
+// For Testing - Use DEV_SECRET env var or allow in development mode
 app.post("/auth/dev", async (req, res) => {
-  if (process.env.NODE_ENV !== "development") {
-    return res.status(403).json({ error: "Forbidden" });
+  try {
+    const { devSecret } = req.body;
+
+    // Allow if NODE_ENV is development OR if correct DEV_SECRET is provided
+    const isDevMode = process.env.NODE_ENV === "development";
+    const hasValidSecret = process.env.DEV_SECRET && devSecret === process.env.DEV_SECRET;
+
+    if (!isDevMode && !hasValidSecret) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const userId = uuidv4();
+
+    await pool.query(
+      `
+      INSERT INTO users (id, apple_user_id, email, available_tryons)
+      VALUES ($1, $2, $3, $4)
+      `,
+      [userId, `dev-${userId}`, "dev@test.com", 3]
+    );
+
+    const token = createToken(userId);
+
+    res.json({ token });
+  } catch (err) {
+    console.error("DEV AUTH ERROR:", err);
+    res.status(500).json({ error: err.message });
   }
-
-  const userId = uuidv4();
-
-  await pool.query(
-    `
-    INSERT INTO users (id, apple_user_id, email)
-    VALUES ($1, $2, $3)
-    `,
-    [userId, `dev-${userId}`, "dev@test.com"]
-  );
-
-  const token = createToken(userId);
-
-  res.json({ token });
 });
 
 // Export handler for AWS Lambda
