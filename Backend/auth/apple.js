@@ -6,7 +6,6 @@ const client = jwksClient({
   cache: true,
   rateLimit: true,
 });
-
 function getKey(header, callback) {
   client.getSigningKey(header.kid, (err, key) => {
     if (err) {
