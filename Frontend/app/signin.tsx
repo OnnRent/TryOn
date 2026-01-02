@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Dimensions, Easing } from "react-native";
+import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Dimensions, Easing, TouchableOpacity } from "react-native";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { useAuth } from "../src/context/AuthContext";
 import { router } from "expo-router";
@@ -7,6 +7,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { useThemeColors, useIsDarkMode } from "../src/theme/colors";
+
+const DEV_MODE = __DEV__;
 
 const { width, height } = Dimensions.get("window");
 
@@ -263,10 +265,29 @@ export default function SignInScreen() {
 
     setIsLoading(true);
     try {
-      const res = await fetch("https://api.tryonapp.in/auth/dev", {
+      // Get credentials from Apple
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        throw new Error("No identity token received from Apple");
+      }
+
+      // Send identity token to backend for verification
+      const res = await fetch("https://api.tryonapp.in/auth/apple", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "dev@tryon.app", fullName: "Dev User" }),
+        body: JSON.stringify({
+          identityToken: credential.identityToken,
+          fullName: credential.fullName
+            ? `${credential.fullName.givenName || ""} ${credential.fullName.familyName || ""}`.trim()
+            : null,
+          email: credential.email,
+        }),
       });
 
       if (!res.ok) {
@@ -278,7 +299,42 @@ export default function SignInScreen() {
       await login(data.token);
       router.replace("/(app)");
     } catch (e: any) {
+      // Handle user cancellation gracefully
+      if (e.code === "ERR_REQUEST_CANCELED") {
+        // User cancelled, do nothing
+        return;
+      }
       Alert.alert("Sign In Failed", e.message || "Unable to sign in. Please try again.", [{ text: "OK" }]);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  // Development sign-in (only available in dev mode)
+  async function signInDev() {
+    if (isLoading) return;
+
+    setIsLoading(true);
+    try {
+      const res = await fetch("https://api.tryonapp.in/auth/dev", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "dev@test.com",
+          name: "Dev User",
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Login failed with status ${res.status}`);
+      }
+
+      const data = await res.json();
+      await login(data.token);
+      router.replace("/(app)");
+    } catch (e: any) {
+      Alert.alert("Dev Sign In Failed", e.message || "Unable to sign in. Please try again.", [{ text: "OK" }]);
     } finally {
       setIsLoading(false);
     }
@@ -593,19 +649,32 @@ export default function SignInScreen() {
               </View>
             </BlurView>
           ) : (
-            <View style={styles.appleButtonWrapper}>
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                buttonStyle={
-                  isDark
-                    ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                    : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                }
-                cornerRadius={16}
-                style={styles.appleBtn}
-                onPress={signInWithApple}
-              />
-            </View>
+            <>
+              <View style={styles.appleButtonWrapper}>
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                  buttonStyle={
+                    isDark
+                      ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                      : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                  }
+                  cornerRadius={16}
+                  style={styles.appleBtn}
+                  onPress={signInWithApple}
+                />
+              </View>
+              {DEV_MODE && (
+                <TouchableOpacity
+                  style={[styles.devButton, { backgroundColor: isDark ? "#374151" : "#e5e7eb" }]}
+                  onPress={signInDev}
+                >
+                  <Ionicons name="code-slash" size={20} color={isDark ? "#fff" : "#1f2937"} />
+                  <Text style={[styles.devButtonText, { color: isDark ? "#fff" : "#1f2937" }]}>
+                    Dev Sign In (localhost)
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
           )}
 
           <Text style={[styles.privacyText, { color: colors.textSecondary }]}>
@@ -838,6 +907,19 @@ const styles = StyleSheet.create({
   appleBtn: {
     width: "100%",
     height: 56,
+  },
+  devButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    height: 56,
+    borderRadius: 16,
+    marginTop: 12,
+  },
+  devButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
   privacyText: {
     fontSize: 12,

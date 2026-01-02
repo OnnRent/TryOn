@@ -42,9 +42,22 @@ app.post("/auth/apple", async (req, res) => {
   try {
     const { identityToken } = req.body;
 
+    if (!identityToken) {
+      return res.status(400).json({ error: "Missing identity token" });
+    }
+
+    if (!process.env.APPLECLIENTID) {
+      console.error("APPLECLIENTID environment variable not set");
+      return res.status(500).json({ error: "Server configuration error" });
+    }
+
+    console.log("Verifying Apple token with audience:", process.env.APPLECLIENTID);
+
     const appleUser = await verifyAppleToken(identityToken);
     const appleUserId = appleUser.sub;
     const email = appleUser.email || null;
+
+    console.log("Apple user verified:", { sub: appleUserId, email });
 
     let user = await pool.query(
       "SELECT id FROM users WHERE apple_user_id = $1",
@@ -52,6 +65,7 @@ app.post("/auth/apple", async (req, res) => {
     );
 
     if (user.rows.length === 0) {
+      console.log("Creating new user for Apple ID:", appleUserId);
       user = await pool.query(
         `
         INSERT INTO users (id, apple_user_id, email, available_tryons)
@@ -67,8 +81,18 @@ app.post("/auth/apple", async (req, res) => {
     res.json({ token });
 
   } catch (err) {
-    console.error("APPLE AUTH ERROR:", err);
-    res.status(401).json({ error: "Authentication failed" });
+    console.error("APPLE AUTH ERROR:", err.message);
+    console.error("Full error:", err);
+
+    // Provide more specific error messages
+    if (err.message?.includes("audience")) {
+      return res.status(401).json({ error: "Invalid app configuration. Please contact support." });
+    }
+    if (err.message?.includes("expired")) {
+      return res.status(401).json({ error: "Session expired. Please try again." });
+    }
+
+    res.status(401).json({ error: "Authentication failed: " + err.message });
   }
 });
 
