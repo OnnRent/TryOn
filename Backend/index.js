@@ -12,6 +12,7 @@ const { generateTryOnImage } = require("./geminiTryOn");
 const axios = require("axios");
 const sharp = require("sharp");
 const { verifyAppleToken } = require("./auth/apple");
+const { verifyGoogleToken } = require("./auth/google");
 const { createToken, verifyToken } = require("./auth/jwt");
 const serverless = require("serverless-http");
 
@@ -90,6 +91,74 @@ app.post("/auth/apple", async (req, res) => {
     }
     if (err.message?.includes("expired")) {
       return res.status(401).json({ error: "Session expired. Please try again." });
+    }
+
+    res.status(401).json({ error: "Authentication failed: " + err.message });
+  }
+});
+
+// Google Sign In (for Android)
+app.post("/auth/google", async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+
+    if (!accessToken) {
+      return res.status(400).json({ error: "Missing access token" });
+    }
+
+    console.log("Verifying Google access token...");
+
+    const googleUser = await verifyGoogleToken(accessToken);
+    const googleUserId = googleUser.sub;
+    const email = googleUser.email || null;
+
+    console.log("Google user verified:", { sub: googleUserId, email });
+
+    // Check if user exists by google_user_id
+    let user = await pool.query(
+      "SELECT id FROM users WHERE google_user_id = $1",
+      [googleUserId]
+    );
+
+    // If not found by google_user_id, check by email (for linking accounts)
+    if (user.rows.length === 0 && email) {
+      user = await pool.query(
+        "SELECT id FROM users WHERE email = $1",
+        [email]
+      );
+
+      // If found by email, update to add google_user_id
+      if (user.rows.length > 0) {
+        await pool.query(
+          "UPDATE users SET google_user_id = $1 WHERE id = $2",
+          [googleUserId, user.rows[0].id]
+        );
+      }
+    }
+
+    // Create new user if not found
+    if (user.rows.length === 0) {
+      console.log("Creating new user for Google ID:", googleUserId);
+      user = await pool.query(
+        `
+        INSERT INTO users (id, google_user_id, email, available_tryons)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id
+        `,
+        [uuidv4(), googleUserId, email, 3]
+      );
+    }
+
+    const token = createToken(user.rows[0].id);
+
+    res.json({ token });
+
+  } catch (err) {
+    console.error("GOOGLE AUTH ERROR:", err.message);
+    console.error("Full error:", err);
+
+    if (err.message?.includes("Invalid access token")) {
+      return res.status(401).json({ error: "Invalid Google credentials. Please try again." });
     }
 
     res.status(401).json({ error: "Authentication failed: " + err.message });

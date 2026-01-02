@@ -40,6 +40,10 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_path TEXT;
 -- New users get 3 free try-ons by default
 ALTER TABLE users ADD COLUMN IF NOT EXISTS available_tryons INTEGER DEFAULT 3;
 
+-- Add google_user_id column for Google Sign-In (Android)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_user_id VARCHAR(255) UNIQUE;
+CREATE INDEX IF NOT EXISTS idx_users_google_user_id ON users(google_user_id);
+
 -- Table for tracking payment orders
 CREATE TABLE IF NOT EXISTS payment_orders (
   id VARCHAR(255) PRIMARY KEY,  -- Razorpay order ID

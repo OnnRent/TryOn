@@ -141,7 +141,6 @@ export default function HomeScreen() {
           ]}
         >
           <View>
-            <Text style={[styles.greeting, { color: colors.textSecondary }]}>Welcome back</Text>
             <Text style={[styles.appName, { color: colors.textPrimary }]}>TryOn</Text>
           </View>
           <TouchableOpacity

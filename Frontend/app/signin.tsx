@@ -1,5 +1,7 @@
-import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Dimensions, Easing, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Dimensions, Easing, TouchableOpacity, Platform } from "react-native";
 import * as AppleAuthentication from "expo-apple-authentication";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
 import { useAuth } from "../src/context/AuthContext";
 import { router } from "expo-router";
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -7,6 +9,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { useThemeColors, useIsDarkMode } from "../src/theme/colors";
+
+WebBrowser.maybeCompleteAuthSession();
 
 const DEV_MODE = __DEV__;
 
@@ -91,11 +95,29 @@ function FloatingParticle({ delay, startX, startY, isDark }: { delay: number; st
   );
 }
 
+const isAndroid = Platform.OS === "android";
+
+// Custom hook to handle Google auth only on Android
+function useGoogleAuth() {
+  if (!isAndroid) {
+    // Return null values for iOS - Google auth not used
+    return [null, null, () => {}] as const;
+  }
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return Google.useAuthRequest({
+    androidClientId: "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
+    // Add your actual Google OAuth client ID above
+  });
+}
+
 export default function SignInScreen() {
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const colors = useThemeColors();
   const isDark = useIsDarkMode();
+
+  // Google Auth setup (only used on Android)
+  const [request, response, promptAsync] = useGoogleAuth();
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -308,6 +330,43 @@ export default function SignInScreen() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  // Google Sign-In (for Android)
+  useEffect(() => {
+    if (response?.type === "success" && response.authentication?.accessToken) {
+      handleGoogleSignIn(response.authentication.accessToken);
+    }
+  }, [response]);
+
+  async function handleGoogleSignIn(accessToken: string) {
+    setIsLoading(true);
+    try {
+      // Send Google access token to backend for verification
+      const res = await fetch("https://api.tryonapp.in/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Login failed with status ${res.status}`);
+      }
+
+      const data = await res.json();
+      await login(data.token);
+      router.replace("/(app)");
+    } catch (e: any) {
+      Alert.alert("Sign In Failed", e.message || "Unable to sign in. Please try again.", [{ text: "OK" }]);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function signInWithGoogle() {
+    if (isLoading || !request) return;
+    promptAsync();
   }
 
   // Development sign-in (only available in dev mode)
@@ -649,19 +708,32 @@ export default function SignInScreen() {
             </BlurView>
           ) : (
             <>
-              <View style={styles.appleButtonWrapper}>
-                <AppleAuthentication.AppleAuthenticationButton
-                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                  buttonStyle={
-                    isDark
-                      ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                      : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                  }
-                  cornerRadius={16}
-                  style={styles.appleBtn}
-                  onPress={signInWithApple}
-                />
-              </View>
+              {isAndroid ? (
+                <TouchableOpacity
+                  style={[styles.googleButton, { backgroundColor: isDark ? "#ffffff" : "#ffffff" }]}
+                  onPress={signInWithGoogle}
+                  disabled={!request}
+                >
+                  <View style={styles.googleIconContainer}>
+                    <Text style={styles.googleIcon}>G</Text>
+                  </View>
+                  <Text style={styles.googleButtonText}>Sign in with Google</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.appleButtonWrapper}>
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                    buttonStyle={
+                      isDark
+                        ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                        : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                    }
+                    cornerRadius={16}
+                    style={styles.appleBtn}
+                    onPress={signInWithApple}
+                  />
+                </View>
+              )}
               {DEV_MODE && (
                 <TouchableOpacity
                   style={[styles.devButton, { backgroundColor: isDark ? "#374151" : "#e5e7eb" }]}
@@ -906,6 +978,37 @@ const styles = StyleSheet.create({
   appleBtn: {
     width: "100%",
     height: 56,
+  },
+  googleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    height: 56,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  googleIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  googleIcon: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#4285F4",
+  },
+  googleButtonText: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#1f1f1f",
   },
   devButton: {
     flexDirection: "row",

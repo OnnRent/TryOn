@@ -21,23 +21,29 @@ function RootNavigator() {
     if (!checked) return;
 
     const inAuthGroup = segments[0] === "(app)";
-    console.log("📍 Navigation check:", { inAuthGroup, hasToken: !!token });
+    const inSignIn = segments[0] === "signin";
+    console.log("📍 Navigation check:", { inAuthGroup, inSignIn, hasToken: !!token });
 
     setTimeout(() => {
-      if (!token && inAuthGroup) {
-        console.log("➡️ Redirect to signin");
-        router.replace("/signin");
-      } else if (token && !inAuthGroup) {
-        console.log("➡️ Redirect to app");
-        router.replace("/(app)");
+      if (!token) {
+        // User is NOT authenticated
+        if (!inSignIn) {
+          // Redirect to signin if not already there
+          console.log("➡️ Redirect to signin (not authenticated)");
+          router.replace("/signin");
+        }
+      } else {
+        // User IS authenticated
+        if (!inAuthGroup) {
+          // Redirect to app if not already in app group
+          console.log("➡️ Redirect to app (authenticated)");
+          router.replace("/(app)");
+        }
       }
-      
 
-      //For Testing
-      // router.replace("/(app)");
       SplashScreen.hideAsync();
     }, 0);
-  }, [token, checked]);
+  }, [token, checked, segments]);
 
   if (!checked) {
     return null;
