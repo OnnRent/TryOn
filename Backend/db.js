@@ -20,16 +20,21 @@ async function streamToBuffer(stream) {
   return Buffer.concat(chunks);
 }
 
+// Use SSL for remote database connections (when DBHOST is set)
+// Only skip SSL for localhost connections
+const isLocalhost = !process.env.DBHOST ||
+  process.env.DBHOST === "localhost" ||
+  process.env.DBHOST === "127.0.0.1";
+
 const pool = new Pool({
   user: "postgres",
   host: process.env.DBHOST,
   database: "wardrobe_db",
-  password:process.env.DBPASSWORD,
+  password: process.env.DBPASSWORD,
   port: 5432,
-  // Only use SSL in production
-  ssl: process.env.NODE_ENV === "production" ? {
+  ssl: isLocalhost ? false : {
     rejectUnauthorized: false
-  } : false
+  }
 });
 
 exports.handler = async (event) => {

@@ -1204,17 +1204,14 @@ app.get("/auth/dev-token", async (req, res) => {
   });
 });
 
-// For Testing - Use DEV_SECRET env var or allow in development mode
+// For Testing - Hardcoded secret for dev login
 app.post("/auth/dev", async (req, res) => {
   try {
     const { devSecret } = req.body;
 
-    // Allow if NODE_ENV is development OR if correct DEV_SECRET is provided
-    const isDevMode = process.env.NODE_ENV === "development";
-    const hasValidSecret = process.env.DEV_SECRET && devSecret === process.env.DEV_SECRET;
-
-    if (!isDevMode && !hasValidSecret) {
-      return res.status(403).json({ error: "Forbidden" });
+    // Simple hardcoded check - change or remove for production
+    if (devSecret !== "tryon-dev-2024") {
+      return res.status(403).json({ error: "Invalid dev secret" });
     }
 
     const userId = uuidv4();
