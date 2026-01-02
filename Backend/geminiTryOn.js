@@ -2,16 +2,12 @@ const axios = require("axios");
 const { GoogleAuth } = require("google-auth-library");
 const sharp = require("sharp");
 const fs = require("fs");
-const path = require("path");
 
 /**
  * Setup Google Cloud credentials for Vercel/serverless environments
  */
 function setupGoogleCredentials() {
-  // If credentials JSON is provided as environment variable (for Vercel)
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-
-    console.log("GOOGLE_APPLICATION_CREDENTIALS_JSON:", process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
     const credPath = '/tmp/gcp-key.json';
     try {
       fs.writeFileSync(credPath, process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
@@ -22,14 +18,9 @@ function setupGoogleCredentials() {
     }
   }
 
-  // Log credential status
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.log("GOOGLE_APPLICATION_CREDENTIALS:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
     console.log("✅ Using credentials file:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
-    // Check if file exists
-    if (fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
-      console.log("✅ Credentials file exists");
-    } else {
+    if (!fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
       console.error("❌ Credentials file not found:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
     }
   } else {
@@ -38,59 +29,50 @@ function setupGoogleCredentials() {
 }
 
 /**
- * Generate virtual try-on image using Vertex AI Virtual Try-On (Nano Banana Pro)
+ * Generate virtual try-on image using Gemini 3 Pro Image model
  * @param {Buffer} personImageBuffer - The person's photo buffer
  * @param {Buffer} clothingImageBuffer - The clothing item buffer
- * @param {string} clothingType - Type of clothing ('top' or 'bottom') - currently not used by the API
+ * @param {string} clothingType - Type of clothing ('top', 'bottom', or 'full')
  * @returns {Promise<Buffer>} - The generated try-on image buffer
  */
 async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothingType) {
   try {
-    // Setup credentials for serverless environments
     setupGoogleCredentials();
 
     const projectId = process.env.GCP_PROJECT_ID;
     const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
     console.log("GCP_PROJECT_ID:", projectId);
     console.log("GOOGLE_CLOUD_LOCATION:", location);
+    console.log("👕 Clothing type:", clothingType || "top");
+
     if (!projectId) {
-      throw new Error("GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID not found in environment variables");
+      throw new Error("GCP_PROJECT_ID not found in environment variables");
     }
 
-    console.log("🔧 Preprocessing images for Vertex AI Virtual Try-On...");
+    console.log("🔧 Preprocessing images for Gemini 3 Pro Image...");
 
-    // Preprocess images: resize and optimize
-    // Virtual Try-On API works best with high-quality images
-    // Use portrait orientation (768x1024) for better try-on results
+    // Preprocess person image - higher quality for face preservation
     const processedPersonImage = await sharp(personImageBuffer)
-      .rotate() // Auto-rotate based on EXIF orientation
-      .resize(768, 1024, {
-        fit: "inside", // Maintain aspect ratio
-        withoutEnlargement: true, // Don't upscale small images
-      })
-      .jpeg({ quality: 90 }) // High quality for better results
+      .rotate()
+      .resize(1024, 1365, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 95 })
       .toBuffer();
 
+    // Preprocess clothing image - PNG for exact color preservation
     const processedClothingImage = await sharp(clothingImageBuffer)
-      .rotate() // Auto-rotate based on EXIF orientation
-      .resize(768, 1024, {
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .jpeg({ quality: 90 })
+      .rotate()
+      .resize(1024, 1365, { fit: "inside", withoutEnlargement: true })
+      .png({ quality: 100 })
       .toBuffer();
 
     console.log(`📊 Image sizes: Person=${(processedPersonImage.length / 1024).toFixed(1)}KB, Clothing=${(processedClothingImage.length / 1024).toFixed(1)}KB`);
 
-    // Convert buffers to base64
+    // Convert to base64
     const personImageBase64 = processedPersonImage.toString("base64");
     const clothingImageBase64 = processedClothingImage.toString("base64");
 
+    // Get access token
     console.log("🔑 Authenticating with Google Cloud...");
-    console.log("Person Image Base64:",personImageBase64);
-    console.log("Clothing Image Base64:",clothingImageBase64);
-
-    // Get access token for Vertex AI
     const auth = new GoogleAuth({
       scopes: ["https://www.googleapis.com/auth/cloud-platform"],
     });
@@ -101,89 +83,105 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
       throw new Error("Failed to get access token for Vertex AI");
     }
 
-    // Prepare request payload for Virtual Try-On API
+    // Build the prompt for virtual try-on with strict preservation instructions
+    const clothingDescription = clothingType === "bottom" ? "pants/bottom wear" :
+                                clothingType === "full" ? "full outfit" : "top/shirt";
+
+    const prompt = `You are a professional virtual try-on system. Generate a photorealistic image of the person in the first image wearing the ${clothingDescription} shown in the second image.
+
+CRITICAL REQUIREMENTS - YOU MUST FOLLOW THESE EXACTLY:
+1. FACE PRESERVATION: Keep the person's face EXACTLY as it appears - same expression, same features, same lighting on face. Do NOT modify, enhance, or change the facial expression in any way.
+2. CLOTHING COLOR: Use the EXACT colors from the clothing image. Do NOT change, adjust, or modify the clothing colors at all. The colors must match the original clothing image precisely.
+3. CLOTHING DESIGN: Preserve all patterns, textures, logos, and design elements from the clothing image exactly as shown.
+4. BODY POSITION: Maintain the person's exact pose and body position from the original photo.
+5. BACKGROUND: Keep the original background from the person's photo.
+6. LIGHTING: Match the lighting conditions from the person's original photo.
+7. REALISTIC FIT: Make the clothing fit naturally on the person's body while maintaining all the above requirements.
+
+Generate a single high-quality photorealistic image.`;
+
+    // Prepare request for Gemini 3 Pro Image
     const requestBody = {
-      instances: [
+      contents: [
         {
-          personImage: {
-            image: {
-              bytesBase64Encoded: personImageBase64,
-            },
-          },
-          productImages: [
+          role: "user",
+          parts: [
+            { text: prompt },
             {
-              image: {
-                bytesBase64Encoded: clothingImageBase64,
-              },
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: personImageBase64
+              }
             },
-          ],
-        },
+            {
+              inlineData: {
+                mimeType: "image/png",
+                data: clothingImageBase64
+              }
+            }
+          ]
+        }
       ],
-      parameters: {
-        sampleCount: 1, // Number of images to generate (1-4)
-      },
+      generationConfig: {
+        responseModalities: ["IMAGE", "TEXT"],
+        temperature: 0.2, // Lower temperature for more consistent/faithful output
+      }
     };
 
-    const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/virtual-try-on-preview-08-04:predict`;
+    const modelVersion = process.env.GEMINI_IMAGE_MODEL || "gemini-3-pro-image-preview";
+    const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelVersion}:generateContent`;
 
-    console.log("🎨 Sending request to Vertex AI Virtual Try-On API...");
+    console.log("🎨 Sending request to Gemini 3 Pro Image API...");
+    console.log(`📍 Model: ${modelVersion}`);
     console.log(`📍 Endpoint: ${endpoint}`);
 
-    // Call Vertex AI Virtual Try-On API
     const response = await axios.post(endpoint, requestBody, {
       headers: {
         Authorization: `Bearer ${accessToken.token}`,
         "Content-Type": "application/json",
       },
-      timeout: 120000, // 120 second timeout
+      timeout: 180000, // 3 minute timeout for image generation
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
     });
 
     // Extract generated image from response
-    if (
-      response.data &&
-      response.data.predictions &&
-      response.data.predictions.length > 0
-    ) {
-      const prediction = response.data.predictions[0];
+    if (response.data?.candidates?.[0]?.content?.parts) {
+      const parts = response.data.candidates[0].content.parts;
 
-      if (prediction.bytesBase64Encoded) {
-        console.log("✅ Successfully generated try-on image with Virtual Try-On");
+      for (const part of parts) {
+        if (part.inlineData?.data) {
+          console.log("✅ Successfully generated try-on image with Gemini 3 Pro Image");
 
-        // Convert base64 to buffer
-        const resultBuffer = Buffer.from(prediction.bytesBase64Encoded, "base64");
+          const resultBuffer = Buffer.from(part.inlineData.data, "base64");
 
-        // Post-process: ensure portrait orientation and correct rotation
-        const processedResult = await sharp(resultBuffer)
-          .rotate() // Auto-rotate based on EXIF orientation
-          .toBuffer();
-
-        // Check if image is landscape and needs rotation
-        const metadata = await sharp(processedResult).metadata();
-        console.log(`📐 Result image dimensions: ${metadata.width}x${metadata.height}`);
-
-        // If width > height, the image is landscape - rotate it to portrait
-        if (metadata.width > metadata.height) {
-          console.log("🔄 Rotating landscape image to portrait orientation");
-          const rotatedResult = await sharp(processedResult)
-            .rotate(90)
+          // Post-process for correct orientation
+          const processedResult = await sharp(resultBuffer)
+            .rotate()
             .toBuffer();
-          return rotatedResult;
-        }
 
-        return processedResult;
+          const metadata = await sharp(processedResult).metadata();
+          console.log(`📐 Result image dimensions: ${metadata.width}x${metadata.height}`);
+
+          // Rotate if landscape
+          if (metadata.width > metadata.height) {
+            console.log("🔄 Rotating landscape image to portrait orientation");
+            return await sharp(processedResult).rotate(90).toBuffer();
+          }
+
+          return processedResult;
+        }
       }
     }
 
-    console.error("❌ No image data in Virtual Try-On API response");
+    console.error("❌ No image data in Gemini response");
     console.error("Response structure:", JSON.stringify(response.data, null, 2));
-    throw new Error("No image data in Virtual Try-On API response");
+    throw new Error("No image data in Gemini 3 Pro Image response");
   } catch (error) {
     if (error.response?.data) {
-      console.error("❌ Virtual Try-On API Error Response:", JSON.stringify(error.response.data, null, 2));
+      console.error("❌ Gemini API Error Response:", JSON.stringify(error.response.data, null, 2));
     } else {
-      console.error("❌ Virtual Try-On API Error:", error.message);
+      console.error("❌ Gemini API Error:", error.message);
     }
     throw new Error(`Failed to generate try-on image: ${error.response?.data?.error?.message || error.message}`);
   }
