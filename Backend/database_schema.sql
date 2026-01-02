@@ -24,10 +24,14 @@ CREATE TABLE IF NOT EXISTS generated_images (
   generation_time_ms INTEGER  -- Time taken to generate
 );
 
+-- Add cache_key column for caching optimization
+ALTER TABLE generated_images ADD COLUMN IF NOT EXISTS cache_key VARCHAR(100);
+
 -- Index for faster queries
 CREATE INDEX IF NOT EXISTS idx_generated_images_user_id ON generated_images(user_id);
 CREATE INDEX IF NOT EXISTS idx_generated_images_status ON generated_images(status);
 CREATE INDEX IF NOT EXISTS idx_generated_images_created_at ON generated_images(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_generated_images_cache_key ON generated_images(cache_key);
 
 -- Add avatar_path column to users table if it doesn't exist
 ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_path TEXT;

@@ -344,7 +344,13 @@ app.post("/auth/logout", verifyToken, async (req, res) => {
 
 
 
-// Virtual Try-On Endpoint - ASYNC VERSION (Returns immediately, processes in background)
+// Helper: Generate image hash for caching
+const crypto = require("crypto");
+function generateImageHash(buffer) {
+  return crypto.createHash("md5").update(buffer).digest("hex").substring(0, 16);
+}
+
+// Virtual Try-On Endpoint - ASYNC VERSION with CACHING
 app.post(
   "/tryon/generate",
   verifyToken,
@@ -377,15 +383,7 @@ app.post(
       const user = userResult.rows[0];
       const availableTryons = user.available_tryons || 0;
 
-      // Check if user has credits
-      if (availableTryons <= 0) {
-        return res.status(403).json({
-          error: "No try-ons available. Please purchase more credits to continue.",
-          available_tryons: 0,
-        });
-      }
-
-      // Validate inputs
+      // Validate inputs first (before credit check for better UX)
       if (!req.files?.person_image) {
         return res.status(400).json({
           error: "person_image is required",
@@ -423,7 +421,59 @@ app.post(
         });
       }
 
-      // Upload original images to S3
+      // 🚀 OPTIMIZATION: Check cache for similar request
+      const personHash = generateImageHash(personImageBuffer);
+      const clothingHash = generateImageHash(clothingImageBuffer);
+      const cacheKey = `${req.userId}_${personHash}_${clothingHash}_${clothing_type}`;
+
+      console.log(`🔍 Checking cache: ${cacheKey}`);
+
+      // Check if we have a cached result for this combination
+      const cachedResult = await pool.query(
+        `SELECT id, result_image_path, status
+         FROM generated_images
+         WHERE user_id = $1
+           AND status = 'completed'
+           AND result_image_path IS NOT NULL
+           AND cache_key = $2
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [req.userId, cacheKey]
+      );
+
+      if (cachedResult.rows.length > 0) {
+        console.log("⚡ Cache HIT! Returning cached result instantly");
+        const cached = cachedResult.rows[0];
+
+        // Generate signed URL
+        const resultUrl = s3.getSignedUrl("getObject", {
+          Bucket: process.env.S3BUCKETNAME,
+          Key: cached.result_image_path,
+          Expires: 60 * 60 * 24,
+        });
+
+        return res.json({
+          success: true,
+          message: "Cached result found!",
+          generated_image_id: cached.id,
+          status: "completed",
+          result_url: resultUrl,
+          cached: true,
+          generation_time_ms: 0
+        });
+      }
+
+      console.log("📭 Cache MISS - generating new image");
+
+      // Now check credits (after cache check - cached results are free!)
+      if (availableTryons <= 0) {
+        return res.status(403).json({
+          error: "No try-ons available. Please purchase more credits to continue.",
+          available_tryons: 0,
+        });
+      }
+
+      // Upload original images to S3 (in parallel with job creation)
       const personImageKey = `tryon/${req.userId}/person/${uuidv4()}.jpg`;
       const clothingImageKey = `tryon/${req.userId}/clothing/${uuidv4()}.jpg`;
 
@@ -446,14 +496,11 @@ app.post(
 
       console.log("✅ Source images uploaded");
 
-      // Create prompt for Gemini
-      const prompt = `Create a realistic virtual try-on image. Show the person wearing the ${clothing_type}. Maintain the person's pose, body shape, and background. The clothing should fit naturally and look realistic.`;
-
-      // Create database record with PENDING status
+      // Create database record with PENDING status (includes cache_key for future lookups)
       generatedImageId = uuidv4();
       await pool.query(
         `INSERT INTO generated_images
-         (id, user_id, person_image_path, wardrobe_item_id, clothing_image_path, status, prompt_used)
+         (id, user_id, person_image_path, wardrobe_item_id, clothing_image_path, status, cache_key)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           generatedImageId,
@@ -462,7 +509,7 @@ app.post(
           wardrobe_item_id || null,
           clothingImageKey,
           "pending",
-          prompt,
+          cacheKey,
         ]
       );
 

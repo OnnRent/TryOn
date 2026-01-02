@@ -72,17 +72,20 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
 
     console.log("🔧 Preprocessing images...");
 
-    // Process images in parallel - Virtual Try-On works best with clean images
+    // Optimized image size - 768px is sufficient for good results and faster processing
+    const imageSize = parseInt(process.env.VTON_IMAGE_SIZE) || 768;
+
+    // Process images in parallel with optimized settings
     const [processedPersonImage, processedClothingImage] = await Promise.all([
       sharp(personImageBuffer)
         .rotate()
-        .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
-        .png()
+        .resize(imageSize, imageSize, { fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 85 })  // JPEG is faster than PNG
         .toBuffer(),
       sharp(clothingImageBuffer)
         .rotate()
-        .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
-        .png()
+        .resize(imageSize, imageSize, { fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 90 })
         .toBuffer(),
     ]);
 
@@ -106,6 +109,8 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
     console.log("✅ Authenticated successfully");
 
     // Virtual Try-On API request body
+    // Note: This API doesn't accept text prompts - it's designed to preserve product image automatically
+    // Higher baseSteps = better quality/preservation but slower
     const requestBody = {
       instances: [
         {
@@ -125,10 +130,15 @@ async function generateTryOnImage(personImageBuffer, clothingImageBuffer, clothi
       ],
       parameters: {
         sampleCount: 1,
-        baseSteps: 32,
+        // baseSteps: lower = faster, higher = better quality
+        // 20-25: Fast (~15-20s), acceptable quality
+        // 32: Default (~25-35s), good quality
+        // 50: Slow (~45-60s), best quality
+        baseSteps: parseInt(process.env.VTON_BASE_STEPS) || 25,
         personGeneration: "allow_adult",
         outputOptions: {
-          mimeType: "image/png"
+          mimeType: "image/jpeg",  // JPEG is faster than PNG
+          compressionQuality: 85
         }
       }
     };
