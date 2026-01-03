@@ -414,6 +414,44 @@ app.post("/auth/logout", verifyToken, async (req, res) => {
 });
 
 
+// Add credits to user account (simple version without payment)
+app.post("/credits/add", verifyToken, async (req, res) => {
+  try {
+    const { package_id, tryons } = req.body;
+
+    if (!package_id || !tryons || tryons <= 0) {
+      return res.status(400).json({ error: "Invalid package" });
+    }
+
+    console.log(`💰 Adding ${tryons} credits for user ${req.userId} (package: ${package_id})`);
+
+    // Add credits to user account
+    const result = await pool.query(
+      `UPDATE users
+       SET available_tryons = COALESCE(available_tryons, 0) + $1
+       WHERE id = $2
+       RETURNING available_tryons`,
+      [tryons, req.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const newBalance = result.rows[0].available_tryons;
+    console.log(`✅ Credits added! New balance: ${newBalance}`);
+
+    res.json({
+      success: true,
+      message: `Added ${tryons} try-ons to your account!`,
+      credits_added: tryons,
+      available_tryons: newBalance,
+    });
+  } catch (err) {
+    console.error("ADD CREDITS ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 

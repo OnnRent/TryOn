@@ -5,11 +5,14 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "../../src/theme/colors";
 import { router } from "expo-router";
+import { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type PricingTier = {
   id: string;
@@ -43,8 +46,9 @@ const PRICING_TIERS: PricingTier[] = [
 
 export default function PricingScreen() {
   const colors = useThemeColors();
+  const [loading, setLoading] = useState<string | null>(null);
 
-  const handleSelectPlan = (tier: PricingTier) => {
+  const handleSelectPlan = async (tier: PricingTier) => {
     if (tier.id === "free") {
       Alert.alert(
         "Free Tier",
@@ -54,10 +58,56 @@ export default function PricingScreen() {
       return;
     }
 
+    // Confirm purchase
     Alert.alert(
-      "Coming Soon",
-      `Payment integration for ${tier.name} (₹${tier.price}/month) will be available soon!\n\nYou'll get ${tier.tryons} try-ons per month.`,
-      [{ text: "OK" }]
+      "Get Credits",
+      `Add ${tier.tryons} try-ons to your account?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Yes, Add Credits",
+          onPress: async () => {
+            try {
+              setLoading(tier.id);
+
+              const token = await AsyncStorage.getItem("token");
+              if (!token) {
+                Alert.alert("Error", "Please log in again");
+                return;
+              }
+
+              const response = await fetch("https://api.tryonapp.in/credits/add", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  package_id: tier.id,
+                  tryons: tier.tryons,
+                }),
+              });
+
+              const data = await response.json();
+
+              if (!response.ok) {
+                throw new Error(data.error || "Failed to add credits");
+              }
+
+              Alert.alert(
+                "Success! 🎉",
+                `${data.credits_added} try-ons added!\n\nYour balance: ${data.available_tryons} try-ons`,
+                [{ text: "OK", onPress: () => router.back() }]
+              );
+            } catch (error: any) {
+              console.error("Add credits error:", error);
+              Alert.alert("Error", error.message || "Failed to add credits");
+            } finally {
+              setLoading(null);
+            }
+          },
+        },
+      ]
     );
   };
 
@@ -91,12 +141,20 @@ export default function PricingScreen() {
               key={tier.id}
               onPress={() => handleSelectPlan(tier)}
               activeOpacity={0.8}
+              disabled={loading === tier.id}
               style={[
                 styles.pricingCard,
                 { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
                 tier.popular && styles.popularCard,
+                loading === tier.id && { opacity: 0.7 },
               ]}
             >
+              {loading === tier.id && (
+                <View style={styles.loadingOverlay}>
+                  <ActivityIndicator size="small" color={colors.accent} />
+                </View>
+              )}
+
               {tier.popular && (
                 <View style={[styles.popularBadge, { backgroundColor: colors.accent }]}>
                   <Text style={styles.popularText}>Most Popular</Text>
@@ -192,6 +250,16 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 2,
     position: "relative",
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
   },
   popularCard: {
     borderColor: "#D4AF37",
