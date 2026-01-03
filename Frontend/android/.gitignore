@@ -1,16 +1,28 @@
 # OSX
-#
 .DS_Store
 
 # Android/IntelliJ
-#
 build/
+app/build/
 .idea
 .gradle
 local.properties
 *.iml
 *.hprof
 .cxx/
+app/.cxx/
 
 # Bundle artifacts
 *.jsbundle
+
+# Generated files
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# Keystore files
+*.jks
+*.keystore
+!debug.keystore
