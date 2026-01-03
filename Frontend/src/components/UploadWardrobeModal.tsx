@@ -117,13 +117,6 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
     const data = await res.json();
 
 
-
-
-
-
-
-
-
     if (!res.ok) {
       throw new Error(data.error || "Failed to create wardrobe item");
     }
@@ -172,7 +165,6 @@ export default function UploadWardrobeModal({ visible, onClose }: Props) {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
-        // Don't set Content-Type - let fetch set it automatically with boundary
       },
       body: formData,
     });
