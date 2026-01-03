@@ -1,4 +1,4 @@
-import { View, FlatList, ActivityIndicator, Text, RefreshControl, StyleSheet } from "react-native";
+import { View, FlatList, ActivityIndicator, Text, RefreshControl, StyleSheet, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useEffect } from "react";
 import { useThemeColors } from "../../src/theme/colors";
@@ -73,6 +73,58 @@ export default function ImagesScreen() {
     fetchGeneratedImages();
   };
 
+  // Delete generated image
+  const handleDelete = (imageId: string) => {
+    Alert.alert(
+      "Delete Image",
+      "Are you sure you want to delete this generated image? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem("token");
+              if (!token) {
+                console.error("No auth token found");
+                return;
+              }
+
+              console.log(`🗑️ Deleting image: ${imageId}`);
+
+              const response = await fetch(
+                `https://api.tryonapp.in/tryon/${imageId}`,
+                {
+                  method: "DELETE",
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                }
+              );
+
+              console.log(`📥 Delete response status: ${response.status}`);
+
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.error("❌ Delete error:", errorData);
+                throw new Error(errorData.error || "Failed to delete image");
+              }
+
+              console.log("✅ Image deleted successfully");
+
+              // Remove from local state immediately for smooth UX
+              setGeneratedImages((prev) => prev.filter((img) => img.id !== imageId));
+            } catch (error) {
+              console.error("Error deleting image:", error);
+              Alert.alert("Error", "Failed to delete image. Please try again.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Show loading state
   if (loading) {
     return (
@@ -128,6 +180,7 @@ export default function ImagesScreen() {
                 setPreviewImages([item.result_url, item.person_url, item.clothing_url]);
                 setPreviewOpen(true);
               }}
+              onDelete={() => handleDelete(item.id)}
             />
           </View>
         )}

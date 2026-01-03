@@ -4,14 +4,16 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "../theme/colors";
 
 type Props = {
   uri: string;
   onPress: () => void;
+  onDelete?: () => void;
 };
 
-export default function GeneratedImageCard({ uri, onPress }: Props) {
+export default function GeneratedImageCard({ uri, onPress, onDelete }: Props) {
   const colors = useThemeColors();
 
   return (
@@ -30,6 +32,19 @@ export default function GeneratedImageCard({ uri, onPress }: Props) {
       <View
         style={[styles.borderOverlay, { borderColor: colors.glassBorder }]}
       />
+
+      {/* Delete button */}
+      {onDelete && (
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          <Ionicons name="trash-outline" size={18} color="#fff" />
+        </TouchableOpacity>
+      )}
     </TouchableOpacity>
   );
 }
@@ -53,5 +68,16 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     borderRadius: 18,
     borderWidth: 1,
+  },
+  deleteButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 59, 48, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
