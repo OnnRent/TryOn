@@ -475,104 +475,27 @@ export default function CameraScreen() {
               return;
             }
 
-            // Determine which item to use (top or bottom)
-            const selectedItem = selection.top || selection.bottom;
-            if (!selectedItem) {
+            // Check what's selected
+            const hasTop = !!selection.top;
+            const hasBottom = !!selection.bottom;
+
+            if (!hasTop && !hasBottom) {
               Alert.alert("Error", "Please select a clothing item");
               setFlowState("CAPTURE");
               return;
             }
 
-            const clothingType = selection.top ? "top" : "bottom";
-
-            console.log("🎨 Generating virtual try-on...", {
-              itemId: selectedItem.id,
-              type: clothingType,
-            });
-
-            // Fetch wardrobe item images
-            const wardrobeResponse = await fetch(
-              `https://api.tryonapp.in/wardrobe/${selectedItem.id}/images`,
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              }
-            );
-
-            if (!wardrobeResponse.ok) {
-              throw new Error("Failed to fetch wardrobe images");
-            }
-
-            const wardrobeData = await wardrobeResponse.json();
-            const clothingImageUrl = wardrobeData.images.front || wardrobeData.images.back;
-
-            if (!clothingImageUrl) {
-              throw new Error("No clothing image found");
-            }
-
-            // Compress person image before upload
-            console.log("🗜️ Compressing person image...");
-            const compressedPhotoUri = await compressImage(photoUri);
-
-            // Prepare form data with file URIs (React Native way)
-            const formData = new FormData();
-
-            // Add person image - compressed
-            // @ts-ignore - React Native FormData accepts file URIs
-            formData.append("person_image", {
-              uri: compressedPhotoUri,
-              type: "image/jpeg",
-              name: "person.jpg",
-            } as any);
-
-            // Add clothing image - use S3 URL directly
-            // @ts-ignore - React Native FormData accepts URLs
-            formData.append("clothing_image", {
-              uri: clothingImageUrl,
-              type: "image/jpeg",
-              name: "clothing.jpg",
-            } as any);
-
-            formData.append("wardrobe_item_id", selectedItem.id);
-            formData.append("clothing_type", clothingType);
-
-            console.log("📦 FormData prepared with URIs:", {
-              personUri: compressedPhotoUri,
-              clothingUri: clothingImageUrl,
-            });
-
-            console.log("📤 Sending to virtual try-on API...");
-
-            // Call virtual try-on API
-            const tryonResponse = await fetch("https://api.tryonapp.in/tryon/generate", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-              body: formData,
-            });
-
-            const tryonData = await tryonResponse.json();
-
-            if (!tryonResponse.ok) {
-              throw new Error(tryonData.message || "Virtual try-on failed");
-            }
-
-            console.log(`✅ Job created: ${tryonData.generated_image_id}`);
-            console.log("⏳ Waiting for processing to complete...");
-
-            // Helper function to poll job status with exponential backoff
-            async function pollJobStatus(jobId: string, token: string): Promise<string> {
-              const maxAttempts = 40; // Reduced from 60
-              let pollInterval = 3000; // Start with 3 seconds
-              const maxInterval = 15000; // Max 15 seconds between polls
+            // Helper function to poll job status
+            async function pollJobStatus(jobId: string, authToken: string): Promise<string> {
+              const maxAttempts = 40;
+              let pollInterval = 3000;
+              const maxInterval = 15000;
 
               for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                console.log(`🔄 Polling attempt ${attempt + 1}/${maxAttempts}... (waiting ${pollInterval/1000}s)`);
+                console.log(`🔄 Polling attempt ${attempt + 1}/${maxAttempts}...`);
 
                 const statusResponse = await fetch(`https://api.tryonapp.in/tryon/status/${jobId}`, {
-                  headers: { Authorization: `Bearer ${token}` },
+                  headers: { Authorization: `Bearer ${authToken}` },
                 });
 
                 if (!statusResponse.ok) {
@@ -592,23 +515,125 @@ export default function CameraScreen() {
                 }
 
                 await new Promise(resolve => setTimeout(resolve, pollInterval));
-
-                // Exponential backoff: increase interval after first few attempts
                 if (attempt >= 5) {
                   pollInterval = Math.min(pollInterval * 1.2, maxInterval);
                 }
               }
-
-              throw new Error("Job timed out after 10 minutes. Please try again.");
+              throw new Error("Job timed out. Please try again.");
             }
 
-            // Poll for completion
-            const resultUrl = await pollJobStatus(tryonData.generated_image_id, token);
+            // Helper function to generate try-on with a single item
+            async function generateSingleTryOn(
+              personImageUri: string,
+              clothingItem: { id: string },
+              clothingType: "top" | "bottom",
+              authToken: string
+            ): Promise<string> {
+              console.log(`🎨 Generating ${clothingType} try-on...`);
+
+              // Fetch wardrobe item images
+              const wardrobeResponse = await fetch(
+                `https://api.tryonapp.in/wardrobe/${clothingItem.id}/images`,
+                { headers: { Authorization: `Bearer ${authToken}` } }
+              );
+
+              if (!wardrobeResponse.ok) {
+                throw new Error(`Failed to fetch ${clothingType} images`);
+              }
+
+              const wardrobeData = await wardrobeResponse.json();
+              const clothingImageUrl = wardrobeData.images.front || wardrobeData.images.back;
+
+              if (!clothingImageUrl) {
+                throw new Error(`No ${clothingType} image found`);
+              }
+
+              // Prepare form data
+              const formData = new FormData();
+
+              // @ts-ignore
+              formData.append("person_image", {
+                uri: personImageUri,
+                type: "image/jpeg",
+                name: "person.jpg",
+              } as any);
+
+              // @ts-ignore
+              formData.append("clothing_image", {
+                uri: clothingImageUrl,
+                type: "image/jpeg",
+                name: "clothing.jpg",
+              } as any);
+
+              formData.append("wardrobe_item_id", clothingItem.id);
+              formData.append("clothing_type", clothingType);
+
+              console.log(`📤 Sending ${clothingType} to API...`);
+
+              const tryonResponse = await fetch("https://api.tryonapp.in/tryon/generate", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${authToken}` },
+                body: formData,
+              });
+
+              const tryonData = await tryonResponse.json();
+
+              if (!tryonResponse.ok) {
+                throw new Error(tryonData.message || `${clothingType} try-on failed`);
+              }
+
+              console.log(`✅ ${clothingType} job created: ${tryonData.generated_image_id}`);
+
+              // Poll for result
+              return await pollJobStatus(tryonData.generated_image_id, authToken);
+            }
+
+            // Compress person image
+            console.log("🗜️ Compressing person image...");
+            const compressedPhotoUri = await compressImage(photoUri);
+
+            let finalResultUrl: string;
+
+            if (hasTop && hasBottom) {
+              // BOTH selected: Chain generation (top first, then bottom)
+              console.log("👕👖 Both top and bottom selected - chained generation");
+
+              // Step 1: Generate with TOP
+              console.log("📍 Step 1/2: Generating with TOP...");
+              const topResultUrl = await generateSingleTryOn(
+                compressedPhotoUri,
+                selection.top!,
+                "top",
+                token
+              );
+              console.log("✅ Top generation complete!");
+
+              // Step 2: Use top result as new person image, generate with BOTTOM
+              console.log("📍 Step 2/2: Generating with BOTTOM on top result...");
+              finalResultUrl = await generateSingleTryOn(
+                topResultUrl, // Use the top result as the new person image
+                selection.bottom!,
+                "bottom",
+                token
+              );
+              console.log("✅ Bottom generation complete!");
+
+            } else {
+              // Only ONE selected
+              const selectedItem = selection.top || selection.bottom;
+              const clothingType = hasTop ? "top" : "bottom";
+
+              console.log(`👕 Single item selected: ${clothingType}`);
+              finalResultUrl = await generateSingleTryOn(
+                compressedPhotoUri,
+                selectedItem!,
+                clothingType,
+                token
+              );
+            }
 
             console.log("✅ Virtual try-on completed!");
-
-            // Show result
-            setGeneratedImages([resultUrl]);
+            setGeneratedImages([finalResultUrl]);
             setFlowState("RESULT");
 
           } catch (error: any) {
@@ -616,12 +641,7 @@ export default function CameraScreen() {
             Alert.alert(
               "Try-On Failed",
               error.message || "Could not generate virtual try-on. Please try again.",
-              [
-                {
-                  text: "OK",
-                  onPress: () => setFlowState("CAPTURE"),
-                },
-              ]
+              [{ text: "OK", onPress: () => setFlowState("CAPTURE") }]
             );
           }
         }}
