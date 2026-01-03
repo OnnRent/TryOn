@@ -1,16 +1,51 @@
-# OSX
-#
+# ======================
+# macOS
+# ======================
 .DS_Store
 
-# Android/IntelliJ
-#
-build/
-.idea
-.gradle
-local.properties
+# ======================
+# Node / Expo
+# ======================
+node_modules/
+.expo/
+.expo-shared/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ======================
+# Android / IntelliJ
+# ======================
+android/.gradle/
+android/local.properties
+android/**/build/
+.idea/
+.gradle/
 *.iml
 *.hprof
 .cxx/
 
-# Bundle artifacts
+# ======================
+# iOS / Xcode
+# ======================
+ios/Pods/
+ios/build/
+ios/DerivedData/
+*.xcuserstate
+*.xcuserdata
+*.xcscmblueprint
+*.xccheckout
+
+# CocoaPods
+Podfile.lock.bak
+
+# ======================
+# Expo Prebuild Artifacts
+# ======================
 *.jsbundle
+
+# ======================
+# Environment
+# ======================
+.env
+.env.*
