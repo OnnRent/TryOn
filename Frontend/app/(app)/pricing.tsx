@@ -12,15 +12,25 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "../../src/theme/colors";
 import { router } from "expo-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as InAppPurchases from "expo-in-app-purchases";
+import {
+  useIAP,
+  finishTransaction,
+  getReceiptIOS,
+  type Product,
+  type Purchase,
+  type PurchaseError,
+  ErrorCode,
+} from "react-native-iap";
 
 // Apple IAP Product IDs
 const APPLE_PRODUCTS = {
   basic: "com.vanshkarnwal.tryon.basic",
   pro: "com.vanshkarnwal.tryon.pro",
 };
+
+const productIds = [APPLE_PRODUCTS.basic, APPLE_PRODUCTS.pro];
 
 type PricingTier = {
   id: string;
@@ -59,71 +69,60 @@ const PRICING_TIERS: PricingTier[] = [
 export default function PricingScreen() {
   const colors = useThemeColors();
   const [loading, setLoading] = useState<string | null>(null);
-  const [iapConnected, setIapConnected] = useState(false);
-  const [products, setProducts] = useState<InAppPurchases.IAPItemDetails[]>([]);
 
-  // Initialize IAP on iOS
-  useEffect(() => {
-    if (Platform.OS === "ios") {
-      initializeIAP();
-    }
-
-    return () => {
-      if (Platform.OS === "ios" && iapConnected) {
-        InAppPurchases.disconnectAsync().catch(console.error);
-      }
-    };
+  // Handle purchase success
+  const handlePurchaseSuccess = useCallback(async (purchase: Purchase) => {
+    console.log("Purchase success:", purchase);
+    await verifyAndFinishPurchase(purchase);
   }, []);
 
-  const initializeIAP = async () => {
-    try {
-      await InAppPurchases.connectAsync();
-      setIapConnected(true);
-
-      // Get products from App Store
-      const { results } = await InAppPurchases.getProductsAsync([
-        APPLE_PRODUCTS.basic,
-        APPLE_PRODUCTS.pro,
-      ]);
-
-      if (results) {
-        setProducts(results);
-        console.log("📦 IAP Products loaded:", results.map(p => p.productId));
-      }
-
-      // Set up purchase listener
-      InAppPurchases.setPurchaseListener(handlePurchaseUpdate);
-    } catch (error) {
-      console.error("IAP initialization error:", error);
+  // Handle purchase error
+  const handlePurchaseError = useCallback((error: PurchaseError) => {
+    console.error("Purchase error:", error);
+    if (error.code !== ErrorCode.UserCancelled) {
+      Alert.alert("Purchase Failed", error.message || "Something went wrong. Please try again.");
     }
-  };
+    setLoading(null);
+  }, []);
 
-  const handlePurchaseUpdate = async ({ responseCode, results }: { responseCode: InAppPurchases.IAPResponseCode; results?: InAppPurchases.InAppPurchase[] }) => {
-    if (responseCode === InAppPurchases.IAPResponseCode.OK && results) {
-      for (const purchase of results) {
-        if (!purchase.acknowledged) {
-          await verifyAndFinishPurchase(purchase);
-        }
-      }
-    } else if (responseCode === InAppPurchases.IAPResponseCode.USER_CANCELED) {
-      console.log("User cancelled purchase");
-      setLoading(null);
-    } else {
-      console.error("Purchase failed with code:", responseCode);
-      Alert.alert("Purchase Failed", "Something went wrong. Please try again.");
-      setLoading(null);
+  // Use the IAP hook
+  const {
+    connected,
+    products,
+    fetchProducts,
+    requestPurchase,
+  } = useIAP({
+    onPurchaseSuccess: handlePurchaseSuccess,
+    onPurchaseError: handlePurchaseError,
+  });
+
+  // Load products when connected
+  useEffect(() => {
+    if (connected && Platform.OS === "ios") {
+      fetchProducts({ skus: productIds, type: "in-app" });
     }
-  };
+  }, [connected, fetchProducts]);
 
-  const verifyAndFinishPurchase = async (purchase: InAppPurchases.InAppPurchase) => {
+  const verifyAndFinishPurchase = async (purchase: Purchase) => {
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) {
         Alert.alert("Error", "Please log in again");
+        setLoading(null);
         return;
       }
 
-      // Send receipt to backend for verification
+      // Get receipt data for iOS
+      let receiptData: string | null = null;
+      if (Platform.OS === "ios") {
+        try {
+          receiptData = await getReceiptIOS();
+        } catch (e) {
+          console.warn("Could not get receipt:", e);
+        }
+      }
+
+      // Send to backend for verification
       const response = await fetch("https://api.tryonapp.in/iap/apple/verify", {
         method: "POST",
         headers: {
@@ -131,8 +130,9 @@ export default function PricingScreen() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          receiptData: purchase.transactionReceipt,
+          receiptData: receiptData,
           productId: purchase.productId,
+          transactionId: purchase.transactionId,
         }),
       });
 
@@ -143,7 +143,7 @@ export default function PricingScreen() {
       }
 
       // Finish the transaction
-      await InAppPurchases.finishTransactionAsync(purchase, true);
+      await finishTransaction({ purchase, isConsumable: true });
 
       Alert.alert(
         "Success! 🎉",
@@ -163,11 +163,18 @@ export default function PricingScreen() {
 
     try {
       setLoading(tier.id);
-      await InAppPurchases.purchaseItemAsync(tier.appleProductId);
+      await requestPurchase({
+        request: {
+          apple: { sku: tier.appleProductId },
+        },
+        type: "in-app",
+      });
       // Purchase listener will handle the rest
     } catch (error: any) {
       console.error("Apple purchase error:", error);
-      Alert.alert("Purchase Error", error.message || "Failed to start purchase");
+      if (error.code !== ErrorCode.UserCancelled) {
+        Alert.alert("Purchase Error", error.message || "Failed to start purchase");
+      }
       setLoading(null);
     }
   };
@@ -244,9 +251,9 @@ export default function PricingScreen() {
   // Get price from Apple if available
   const getDisplayPrice = (tier: PricingTier) => {
     if (Platform.OS === "ios" && tier.appleProductId) {
-      const product = products.find(p => p.productId === tier.appleProductId);
+      const product = products.find((p: Product) => p.id === tier.appleProductId);
       if (product) {
-        return product.price;
+        return product.displayPrice;
       }
     }
     return `₹${tier.price}`;
