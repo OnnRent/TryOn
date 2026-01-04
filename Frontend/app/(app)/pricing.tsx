@@ -98,10 +98,22 @@ export default function PricingScreen() {
 
   // Load products when connected
   useEffect(() => {
-    if (connected && Platform.OS === "ios") {
-      fetchProducts({ skus: productIds, type: "in-app" });
-    }
+    const loadProducts = async () => {
+      if (connected && Platform.OS === "ios") {
+        console.log("📱 IAP Connected, fetching products:", productIds);
+        await fetchProducts({ skus: productIds, type: "in-app" });
+      }
+    };
+    loadProducts();
   }, [connected, fetchProducts]);
+
+  // Debug: Log products when they change
+  useEffect(() => {
+    console.log("📦 Available products:", products.map(p => ({ id: p.id, price: p.displayPrice })));
+    if (products.length === 0 && connected) {
+      console.warn("⚠️ No products found! Check App Store Connect configuration.");
+    }
+  }, [products, connected]);
 
   const verifyAndFinishPurchase = async (purchase: Purchase) => {
     try {
