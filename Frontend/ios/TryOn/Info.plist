@@ -30,7 +30,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>tryon</string>
-          <string>com.tryon.app</string>
+          <string>com.vanshkarnwal.tryon</string>
         </array>
       </dict>
     </array>
