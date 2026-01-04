@@ -26,8 +26,8 @@ import {
 
 // Apple IAP Product IDs
 const APPLE_PRODUCTS = {
-  basic: "com.vanshkarnwal.tryon.basic",
-  pro: "com.vanshkarnwal.tryon.pro",
+  basic: "com.vanshkarnwal.tryoapp.basic",
+  pro: "com.vanshkarnwal.tryonapp.pro",
 };
 
 const productIds = [APPLE_PRODUCTS.basic, APPLE_PRODUCTS.pro];
