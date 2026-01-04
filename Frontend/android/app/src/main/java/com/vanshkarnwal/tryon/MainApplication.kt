@@ -1,4 +1,4 @@
-package com.tryon.app
+package com.vanshkarnwal.tryon
 
 import android.app.Application
 import android.content.res.Configuration

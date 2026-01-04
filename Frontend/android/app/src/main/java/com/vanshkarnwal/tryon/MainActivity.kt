@@ -1,4 +1,4 @@
-package com.tryon.app
+package com.vanshkarnwal.tryon
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
