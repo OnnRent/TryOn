@@ -6,7 +6,7 @@ const multer = require("multer");
 const cors = require("cors");
 require("dotenv").config();
 const s3 = require("./s3");
-const removeBackground = require("./removeBackground");
+// const removeBackground = require("./removeBackground"); // DISABLED: Background removal temporarily disabled
 const scrapeProductImages = require("./scrapeProductImages");
 const { generateTryOnImage } = require("./geminiTryOn");
 const axios = require("axios");
@@ -306,22 +306,24 @@ app.post(
         console.log(`\n📸 Processing ${img.view} image...`);
         const imageId = uuidv4();
 
+        // DISABLED: Background removal temporarily disabled
         // Try background removal, fallback to original if it fails
-        let imageBuffer;
-        try {
-          if (process.env.REMOVEBGAPIKEY) {
-            console.log(`🎨 Removing background for ${img.view}...`);
-            imageBuffer = await removeBackground(img.file.buffer);
-            console.log(`✅ Background removed for ${img.view}`);
-          } else {
-            console.log("⚠️ No REMOVEBGAPIKEY found, skipping background removal");
-            imageBuffer = img.file.buffer;
-          }
-        } catch (bgError) {
-          console.error(`⚠️ Background removal failed for ${img.view}:`, bgError.message);
-          console.log("📸 Using original image instead");
-          imageBuffer = img.file.buffer;
-        }
+        let imageBuffer = img.file.buffer;
+        console.log(`📸 Using original image for ${img.view} (background removal disabled)`);
+        // try {
+        //   if (process.env.REMOVEBGAPIKEY) {
+        //     console.log(`🎨 Removing background for ${img.view}...`);
+        //     imageBuffer = await removeBackground(img.file.buffer);
+        //     console.log(`✅ Background removed for ${img.view}`);
+        //   } else {
+        //     console.log("⚠️ No REMOVEBGAPIKEY found, skipping background removal");
+        //     imageBuffer = img.file.buffer;
+        //   }
+        // } catch (bgError) {
+        //   console.error(`⚠️ Background removal failed for ${img.view}:`, bgError.message);
+        //   console.log("📸 Using original image instead");
+        //   imageBuffer = img.file.buffer;
+        // }
 
         const s3Key = `raw/${req.userId}/wardrobe/${wardrobe_item_id}/${img.view}.jpg`;
         console.log(`📤 Uploading ${img.view} to S3: ${s3Key}`);
@@ -1190,19 +1192,20 @@ app.post("/wardrobe/import-link", verifyToken, async (req, res) => {
       });
       let imageBuffer = Buffer.from(imageResponse.data);
 
-      // Try background removal, fallback to original if it fails
-      try {
-        if (process.env.REMOVEBGAPIKEY) {
-          console.log(`🎨 Removing background for ${views[i]}...`);
-          imageBuffer = await removeBackground(imageBuffer);
-          console.log(`✅ Background removed for ${views[i]}`);
-        } else {
-          console.log("⚠️ No REMOVEBGAPIKEY found, skipping background removal");
-        }
-      } catch (bgError) {
-        console.error(`⚠️ Background removal failed for ${views[i]}:`, bgError.message);
-        console.log("📸 Using original image instead");
-      }
+      // DISABLED: Background removal temporarily disabled
+      console.log(`📸 Using original image for ${views[i]} (background removal disabled)`);
+      // try {
+      //   if (process.env.REMOVEBGAPIKEY) {
+      //     console.log(`🎨 Removing background for ${views[i]}...`);
+      //     imageBuffer = await removeBackground(imageBuffer);
+      //     console.log(`✅ Background removed for ${views[i]}`);
+      //   } else {
+      //     console.log("⚠️ No REMOVEBGAPIKEY found, skipping background removal");
+      //   }
+      // } catch (bgError) {
+      //   console.error(`⚠️ Background removal failed for ${views[i]}:`, bgError.message);
+      //   console.log("📸 Using original image instead");
+      // }
 
       // Upload to S3
       const s3Key = `raw/${req.userId}/wardrobe/${wardrobeItemId}/${views[i]}.jpg`;
@@ -1303,10 +1306,12 @@ app.post("/wardrobe/link", verifyToken, async (req, res) => {
         responseType: "arraybuffer"
       });
 
-      // Remove background
-      const bgRemovedBuffer = await removeBackground(
-        Buffer.from(imageBuffer.data)
-      );
+      // DISABLED: Background removal temporarily disabled
+      // const bgRemovedBuffer = await removeBackground(
+      //   Buffer.from(imageBuffer.data)
+      // );
+      const imageData = Buffer.from(imageBuffer.data);
+      console.log(`📸 Using original image for ${views[i]} (background removal disabled)`);
 
       // Upload to S3
       const s3Key = `raw/${req.userId}/wardrobe/${wardrobe_item_id}/${views[i]}.png`;
@@ -1314,7 +1319,7 @@ app.post("/wardrobe/link", verifyToken, async (req, res) => {
       await s3.upload({
         Bucket: process.env.S3BUCKETNAME,
         Key: s3Key,
-        Body: bgRemovedBuffer,
+        Body: imageData,  // Changed from bgRemovedBuffer
         ContentType: "image/png"
       }).promise();
 
