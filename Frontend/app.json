@@ -39,6 +39,7 @@
     "plugins": [
       "expo-router",
       "expo-apple-authentication",
+      "expo-in-app-purchases",
       [
         "expo-splash-screen",
         {

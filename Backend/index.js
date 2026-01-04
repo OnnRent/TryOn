@@ -416,6 +416,90 @@ app.post("/auth/logout", verifyToken, async (req, res) => {
 });
 
 
+// Apple In-App Purchase verification and credit addition
+const { verifyAppleReceipt, extractTransaction, getTryonsForProduct } = require("./auth/appleIAP");
+
+app.post("/iap/apple/verify", verifyToken, async (req, res) => {
+  try {
+    const { receiptData, productId } = req.body;
+
+    if (!receiptData) {
+      return res.status(400).json({ error: "Missing receipt data" });
+    }
+
+    console.log(`🍎 Verifying Apple IAP for user ${req.userId}, product: ${productId}`);
+
+    // Verify receipt with Apple
+    const verifiedReceipt = await verifyAppleReceipt(receiptData);
+    const transaction = extractTransaction(verifiedReceipt);
+
+    console.log(`✅ Receipt verified: ${transaction.transactionId}`);
+
+    // Check if transaction already processed (prevent duplicate credits)
+    const existingTx = await pool.query(
+      "SELECT id FROM apple_iap_transactions WHERE transaction_id = $1",
+      [transaction.transactionId]
+    );
+
+    if (existingTx.rows.length > 0) {
+      console.log(`⚠️ Transaction ${transaction.transactionId} already processed`);
+      // Return success but don't add credits again
+      const user = await pool.query(
+        "SELECT available_tryons FROM users WHERE id = $1",
+        [req.userId]
+      );
+      return res.json({
+        success: true,
+        message: "Purchase already processed",
+        already_processed: true,
+        available_tryons: user.rows[0]?.available_tryons || 0,
+      });
+    }
+
+    // Get tryons for product
+    const tryons = getTryonsForProduct(transaction.productId);
+
+    // Record transaction
+    await pool.query(
+      `INSERT INTO apple_iap_transactions
+       (transaction_id, original_transaction_id, user_id, product_id, tryons, purchase_date)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        transaction.transactionId,
+        transaction.originalTransactionId,
+        req.userId,
+        transaction.productId,
+        tryons,
+        transaction.purchaseDate,
+      ]
+    );
+
+    // Add credits to user
+    const result = await pool.query(
+      `UPDATE users
+       SET available_tryons = COALESCE(available_tryons, 0) + $1
+       WHERE id = $2
+       RETURNING available_tryons`,
+      [tryons, req.userId]
+    );
+
+    const newBalance = result.rows[0].available_tryons;
+    console.log(`💰 Added ${tryons} credits! New balance: ${newBalance}`);
+
+    res.json({
+      success: true,
+      message: `Added ${tryons} try-ons to your account!`,
+      credits_added: tryons,
+      available_tryons: newBalance,
+      transaction_id: transaction.transactionId,
+    });
+  } catch (err) {
+    console.error("APPLE IAP VERIFY ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // Add credits to user account (simple version without payment)
 app.post("/credits/add", verifyToken, async (req, res) => {
   try {

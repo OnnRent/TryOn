@@ -75,3 +75,21 @@ CREATE TABLE IF NOT EXISTS api_usage (
 CREATE INDEX IF NOT EXISTS idx_api_usage_user_id ON api_usage(user_id);
 CREATE INDEX IF NOT EXISTS idx_api_usage_created_at ON api_usage(created_at DESC);
 
+-- Table for tracking Apple In-App Purchases
+CREATE TABLE IF NOT EXISTS apple_iap_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  transaction_id VARCHAR(255) UNIQUE NOT NULL,  -- Apple transaction ID (prevents duplicates)
+  original_transaction_id VARCHAR(255),  -- Original transaction ID for subscriptions
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_id VARCHAR(255) NOT NULL,  -- Apple product ID (e.g., com.vanshkarnwal.tryon.basic)
+  tryons INTEGER NOT NULL,  -- Number of try-ons credited
+  purchase_date TIMESTAMP NOT NULL,  -- When the purchase was made
+  verified_at TIMESTAMP DEFAULT NOW(),  -- When we verified with Apple
+  receipt_data TEXT,  -- Optional: store receipt for debugging
+  environment VARCHAR(50) DEFAULT 'production'  -- 'sandbox' or 'production'
+);
+
+CREATE INDEX IF NOT EXISTS idx_apple_iap_user_id ON apple_iap_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_apple_iap_transaction_id ON apple_iap_transactions(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_apple_iap_created_at ON apple_iap_transactions(verified_at DESC);
+

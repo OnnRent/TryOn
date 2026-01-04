@@ -6,20 +6,30 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "../../src/theme/colors";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as InAppPurchases from "expo-in-app-purchases";
+
+// Apple IAP Product IDs
+const APPLE_PRODUCTS = {
+  basic: "com.vanshkarnwal.tryon.basic",
+  pro: "com.vanshkarnwal.tryon.pro",
+};
 
 type PricingTier = {
   id: string;
   name: string;
   price: number;
+  priceDisplay?: string;
   tryons: number;
   popular?: boolean;
+  appleProductId?: string;
 };
 
 const PRICING_TIERS: PricingTier[] = [
@@ -35,18 +45,132 @@ const PRICING_TIERS: PricingTier[] = [
     price: 499,
     tryons: 15,
     popular: true,
+    appleProductId: APPLE_PRODUCTS.basic,
   },
   {
     id: "pro",
     name: "Pro",
     price: 699,
     tryons: 25,
+    appleProductId: APPLE_PRODUCTS.pro,
   },
 ];
 
 export default function PricingScreen() {
   const colors = useThemeColors();
   const [loading, setLoading] = useState<string | null>(null);
+  const [iapConnected, setIapConnected] = useState(false);
+  const [products, setProducts] = useState<InAppPurchases.IAPItemDetails[]>([]);
+
+  // Initialize IAP on iOS
+  useEffect(() => {
+    if (Platform.OS === "ios") {
+      initializeIAP();
+    }
+
+    return () => {
+      if (Platform.OS === "ios" && iapConnected) {
+        InAppPurchases.disconnectAsync().catch(console.error);
+      }
+    };
+  }, []);
+
+  const initializeIAP = async () => {
+    try {
+      await InAppPurchases.connectAsync();
+      setIapConnected(true);
+
+      // Get products from App Store
+      const { results } = await InAppPurchases.getProductsAsync([
+        APPLE_PRODUCTS.basic,
+        APPLE_PRODUCTS.pro,
+      ]);
+
+      if (results) {
+        setProducts(results);
+        console.log("📦 IAP Products loaded:", results.map(p => p.productId));
+      }
+
+      // Set up purchase listener
+      InAppPurchases.setPurchaseListener(handlePurchaseUpdate);
+    } catch (error) {
+      console.error("IAP initialization error:", error);
+    }
+  };
+
+  const handlePurchaseUpdate = async ({ responseCode, results }: { responseCode: InAppPurchases.IAPResponseCode; results?: InAppPurchases.InAppPurchase[] }) => {
+    if (responseCode === InAppPurchases.IAPResponseCode.OK && results) {
+      for (const purchase of results) {
+        if (!purchase.acknowledged) {
+          await verifyAndFinishPurchase(purchase);
+        }
+      }
+    } else if (responseCode === InAppPurchases.IAPResponseCode.USER_CANCELED) {
+      console.log("User cancelled purchase");
+      setLoading(null);
+    } else {
+      console.error("Purchase failed with code:", responseCode);
+      Alert.alert("Purchase Failed", "Something went wrong. Please try again.");
+      setLoading(null);
+    }
+  };
+
+  const verifyAndFinishPurchase = async (purchase: InAppPurchases.InAppPurchase) => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        Alert.alert("Error", "Please log in again");
+        return;
+      }
+
+      // Send receipt to backend for verification
+      const response = await fetch("https://api.tryonapp.in/iap/apple/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          receiptData: purchase.transactionReceipt,
+          productId: purchase.productId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Verification failed");
+      }
+
+      // Finish the transaction
+      await InAppPurchases.finishTransactionAsync(purchase, true);
+
+      Alert.alert(
+        "Success! 🎉",
+        `${data.credits_added} try-ons added!\n\nYour balance: ${data.available_tryons} try-ons`,
+        [{ text: "OK", onPress: () => router.back() }]
+      );
+    } catch (error: any) {
+      console.error("Purchase verification error:", error);
+      Alert.alert("Error", error.message || "Failed to verify purchase");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleApplePurchase = async (tier: PricingTier) => {
+    if (!tier.appleProductId) return;
+
+    try {
+      setLoading(tier.id);
+      await InAppPurchases.purchaseItemAsync(tier.appleProductId);
+      // Purchase listener will handle the rest
+    } catch (error: any) {
+      console.error("Apple purchase error:", error);
+      Alert.alert("Purchase Error", error.message || "Failed to start purchase");
+      setLoading(null);
+    }
+  };
 
   const handleSelectPlan = async (tier: PricingTier) => {
     if (tier.id === "free") {
@@ -58,7 +182,13 @@ export default function PricingScreen() {
       return;
     }
 
-    // Confirm purchase
+    // Use Apple IAP on iOS
+    if (Platform.OS === "ios" && tier.appleProductId) {
+      handleApplePurchase(tier);
+      return;
+    }
+
+    // Android/fallback flow (simple credits add for now)
     Alert.alert(
       "Get Credits",
       `Add ${tier.tryons} try-ons to your account?`,
@@ -109,6 +239,17 @@ export default function PricingScreen() {
         },
       ]
     );
+  };
+
+  // Get price from Apple if available
+  const getDisplayPrice = (tier: PricingTier) => {
+    if (Platform.OS === "ios" && tier.appleProductId) {
+      const product = products.find(p => p.productId === tier.appleProductId);
+      if (product) {
+        return product.price;
+      }
+    }
+    return `₹${tier.price}`;
   };
 
   return (
@@ -168,9 +309,7 @@ export default function PricingScreen() {
                   <Text style={[styles.price, { color: colors.textPrimary }]}>Free</Text>
                 ) : (
                   <>
-                    <Text style={[styles.currency, { color: colors.textPrimary }]}>₹</Text>
-                    <Text style={[styles.price, { color: colors.textPrimary }]}>{tier.price}</Text>
-                    <Text style={[styles.period, { color: colors.textSecondary }]}>/month</Text>
+                    <Text style={[styles.price, { color: colors.textPrimary }]}>{getDisplayPrice(tier)}</Text>
                   </>
                 )}
               </View>
